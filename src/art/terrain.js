@@ -204,18 +204,22 @@
       mat[y * W + x] = grid.kind(Math.floor((x + dx) / 16), Math.floor((y + dy) / 16));
     } }
     const M = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : mat[y * W + x];
-    // distance to non-water (for water shading), up to 8
+    // distance from each water pixel to the nearest land pixel (Chebyshev, capped at 9), for the water shading. Two
+    // passes of a chessboard distance transform: the same answer as searching outward ring by ring, without the
+    // hundreds of lookups per pixel that made big seas (ROUTE 20, CINNABAR, CYCLING ROAD's shore) slow to build
     const wdist = new Uint8Array(W * H);
-    for (let y = 0; y < H; y++) { if ((y & 15) === 15) yield; for (let x = 0; x < W; x++) {
-      if (mat[y * W + x] !== MAT.water) continue;
-      let d = 9;
-      for (let r = 1; r <= 8 && d === 9; r++) {
-        for (let k = -r; k <= r && d === 9; k++) {
-          if ((M(x + k, y - r) && M(x + k, y - r) !== MAT.water) || (M(x + k, y + r) && M(x + k, y + r) !== MAT.water) ||
-            (M(x - r, y + k) && M(x - r, y + k) !== MAT.water) || (M(x + r, y + k) && M(x + r, y + k) !== MAT.water)) d = r;
-        }
-      }
-      wdist[y * W + x] = d;
+    for (let i = 0; i < W * H; i++) wdist[i] = mat[i] === MAT.water ? 9 : 0;
+    for (let y = 0; y < H; y++) { if ((y & 31) === 31) yield; for (let x = 0; x < W; x++) {
+      const i = y * W + x; let d = wdist[i]; if (!d) continue;
+      if (x > 0 && wdist[i - 1] + 1 < d) d = wdist[i - 1] + 1;
+      if (y > 0) { const j = i - W; if (wdist[j] + 1 < d) d = wdist[j] + 1; if (x > 0 && wdist[j - 1] + 1 < d) d = wdist[j - 1] + 1; if (x < W - 1 && wdist[j + 1] + 1 < d) d = wdist[j + 1] + 1; }
+      wdist[i] = d;
+    } }
+    for (let y = H - 1; y >= 0; y--) { if ((y & 31) === 31) yield; for (let x = W - 1; x >= 0; x--) {
+      const i = y * W + x; let d = wdist[i]; if (!d) continue;
+      if (x < W - 1 && wdist[i + 1] + 1 < d) d = wdist[i + 1] + 1;
+      if (y < H - 1) { const j = i + W; if (wdist[j] + 1 < d) d = wdist[j] + 1; if (x > 0 && wdist[j - 1] + 1 < d) d = wdist[j - 1] + 1; if (x < W - 1 && wdist[j + 1] + 1 < d) d = wdist[j + 1] + 1; }
+      wdist[i] = d;
     } }
     const D = surf.data;
     for (let y = 0; y < H; y++) { if ((y & 15) === 15) yield; for (let x = 0; x < W; x++) {

@@ -103,7 +103,7 @@
           if (this.mon(side).hp <= 0 || this.mon(side.foe).hp <= 0) continue;
           yield* this.doMove(side, mv);
           if (this.result) return this.result;
-          yield* this.afterMoveDamage(side);
+          if (this.mon(side.foe).hp > 0) yield* this.afterMoveDamage(side); // a KO skips the attacker's own poison / burn / LEECH SEED, as in Red
           if (yield* this.checkFaints()) { if (this.result) return this.result; break; }
         }
         if (this.safari && this.result) return this.result;
@@ -253,13 +253,13 @@
       v.lastMove = moveId;
       // Metronome / Mirror Move
       if (md.effect === 'METRONOME') {
-        yield* ui.msg(name + ' used METRONOME!');
+        yield* ui.msg(name + ' used METRONOME!', { auto: 18 });
         yield* ui.anim('METRONOME', side);
         const pool = D().moveList.filter(x => x !== 'METRONOME' && x !== 'STRUGGLE');
         md = D().moves[pool[rnd(pool.length)]];
         moveId = md.id;
       } else if (md.effect === 'MIRROR_MOVE') {
-        yield* ui.msg(name + ' used MIRROR MOVE!');
+        yield* ui.msg(name + ' used MIRROR MOVE!', { auto: 18 });
         const last = foe.v.lastUsed;
         if (!last || last === 'MIRROR_MOVE') { yield* ui.msg('But, it failed!'); return; }
         md = D().moves[last]; moveId = md.id;
@@ -275,7 +275,7 @@
       // two-turn moves: first turn charges
       if ((eff === 'CHARGE' || eff === 'FLY') && v.charging !== md.id) {
         v.charging = md.id;
-        yield* ui.msg(name + ' used ' + md.name + '!');
+        yield* ui.msg(name + ' used ' + md.name + '!', { auto: 18 });
         const chargeMsg = { RAZOR_WIND: ' made a whirlwind!', SOLARBEAM: ' took in sunlight!', SKULL_BASH: ' lowered its head!', SKY_ATTACK: ' is glowing!', FLY: ' flew up high!', DIG: ' dug a hole!' }[md.id] || ' is charging!';
         if (md.id === 'FLY' || md.id === 'DIG') { v.invuln = true; yield* ui.anim(md.id + '_CHARGE', side); yield* ui.hide(side, true); }
         else yield* ui.anim('CHARGE', side);
@@ -283,7 +283,7 @@
         return;
       }
       if (v.charging === md.id) { v.charging = null; if (v.invuln) { v.invuln = false; yield* ui.hide(side, false); } }
-      if (!(v.thrash && v.thrash.started) && !(v.bide && v.bide.started)) yield* ui.msg(name + ' used ' + md.name + '!');
+      if (!(v.thrash && v.thrash.started) && !(v.bide && v.bide.started)) yield* ui.msg(name + ' used ' + md.name + '!', { auto: 18 }); // no A press: straight into the animation
       // BIDE
       if (eff === 'BIDE') {
         if (!v.bide) { v.bide = { turns: 2 + rnd(2), dmg: 0, started: true }; yield* ui.anim('BIDE', side); return; }

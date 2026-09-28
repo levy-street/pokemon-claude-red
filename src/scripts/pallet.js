@@ -326,7 +326,9 @@
   G.defMapScript('Route22', {
     step(x, y) {
       if (x !== 29 || (y !== 4 && y !== 5)) return null;
-      const first = S.flag('EVENT_ROUTE22_RIVAL_WANTS_BATTLE') && !S.flag('EVENT_BEAT_ROUTE22_RIVAL_1ST_BATTLE');
+      // the first battle only while EVENT_1ST_ROUTE22_RIVAL_BATTLE is set: the BOULDERBADGE clears it, so a player who
+      // skipped him and comes back with 8 badges meets only the second rival (Route22DefaultScript checks it the same way)
+      const first = S.flag('EVENT_1ST_ROUTE22_RIVAL_BATTLE') && S.flag('EVENT_ROUTE22_RIVAL_WANTS_BATTLE') && !S.flag('EVENT_BEAT_ROUTE22_RIVAL_1ST_BATTLE');
       const second = S.flag('EVENT_2ND_ROUTE22_RIVAL_BATTLE') && !S.flag('EVENT_BEAT_ROUTE22_RIVAL_2ND_BATTLE');
       if (!first && !second) return null;
       return (function* () {

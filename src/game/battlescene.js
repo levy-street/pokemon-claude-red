@@ -303,6 +303,12 @@
         this.lastAction = act;
         if (b.safari) return { type: 'safari', what: ['ball', 'bait', 'rock', 'run'][act] };
         if (act === 0) {
+          // asleep or frozen: FIGHT skips the move menu and the turn plays out (the move isn't used anyway)
+          if (m.status === 'SLP' || m.status === 'FRZ') {
+            const ml = b.moveList(b.p), v = b.p.v, ok = i => ml[i] && ml[i].pp > 0 && !(v.disabled && v.disabled.move === ml[i].id);
+            const slot = ok(this.lastMove || 0) ? this.lastMove || 0 : ml.findIndex((_, i) => ok(i));
+            return { type: 'fight', slot: Math.max(0, slot) };
+          }
           const slot = yield* this.moveMenu(b);
           if (slot < 0) continue;
           return { type: 'fight', slot };

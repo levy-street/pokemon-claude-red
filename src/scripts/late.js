@@ -931,8 +931,9 @@
         if (r !== 'win') return;
         S.set('EVENT_BEAT_CHAMPION_RIVAL');
         yield* say('ChampionsRoomRivalAfterBattleText');
-        // PROF.OAK arrives
-        S.music('oak');
+        // PROF.OAK arrives to a slowed-down CITIES1 (ChampionsRoomOakArrivesScript: Music_Cities1AlternateTempo)
+        G.stopMusic && G.stopMusic(); yield* S.wait(60);
+        S.music('Cities1@232');
         yield* say('ChampionsRoomOakText');
         const oak = S.show('CHAMPIONSROOM_OAK', null, [3, 7]);
         yield* S.move(oak, 'UUUUU');

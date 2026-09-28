@@ -63,6 +63,7 @@
       const ov = G.buildingStyles && G.buildingStyles(map, b, MX, MY);
       if (ov) Object.assign(opts, ov);
       G.buildings.paintBuilding(s, up, b, Lsurf, 0, 0, opts);
+      yield; // a building at a time, so a background build never stalls a frame
       if (b.type !== 'terrace') for (const [bx, by] of b.cells) { const l = Lsurf(bx, by); if (l === 'window' || l === 'door' || l === 'sign_poke' || l === 'sign_mart') lights.push({ x: bx * 16 + 8, y: by * 16 + 9, k: l }); }
     }
     // ships (S.S. Anne at the dock)
@@ -119,12 +120,13 @@
       }
     } }
     elevationEdges(s, map, MX * 16, MY * 16);
-    // water mask: pixels still showing base water
+    yield;
+    // water mask: pixels still showing base water (a big sea is a lot of pixels: pause every 16 rows)
     const wmask = new Uint8Array(W * H);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) { if ((y & 15) === 15) yield; for (let x = 0; x < W; x++) {
       const i = y * W + x;
       if (ground.mat[i] === MATOF.water && s.data[i] === T.waterColor(wx0 + x, wy0 + y, ground.wdist[i], 0)) wmask[i] = 1;
-    }
+    } }
     // first frame of animated cells
     const R = { map, s, up, W, H, mx: MX, my: MY, anim, wmask, wdist: ground.wdist, wx0, wy0, lastT: -1, gcell: {}, lights, fires };
     for (const a of anim) if (a.t === 'grass') R.gcell[a.cx + ',' + a.cy] = a;

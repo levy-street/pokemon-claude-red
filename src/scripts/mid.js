@@ -496,7 +496,24 @@
   }
 
   // 5F: purified zone heals the party once per entry into the zone
+  // the purified zone glows: a soft 2x2 square of light on the floor, so you can see where to stand
+  const PURIFIED_FX = { under: true, draw(s, cx, cy, t) {
+    if (!G.ow || G.ow.map.name !== 'PokemonTower5F') return false;
+    const x0 = 10 * 16 - cx, y0 = 8 * 16 - cy, glow = 0.45 + 0.12 * Math.sin(t / 22), { hex, mix } = G.gfx;
+    const edge = hex('#fbf6ff'), fill = hex('#c8b8ff'), d = s.data;
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const sx = x0 + x, sy = y0 + y; if (sx < 0 || sy < 0 || sx >= s.w || sy >= s.h) continue;
+      const border = x === 0 || y === 0 || x === 31 || y === 31, inner = x === 2 || y === 2 || x === 29 || y === 29;
+      const k = sy * s.w + sx; d[k] = mix(d[k], border || inner ? edge : fill, border ? Math.min(1, glow + 0.4) : inner ? glow + 0.2 : glow);
+    }
+    for (let i = 0; i < 4; i++) { // motes rising from the square
+      const ph = (t + i * 29) % 90, px = x0 + 5 + ((i * 11 + Math.floor((t + i * 29) / 90) * 7) % 22), py = y0 + 28 - Math.floor(ph / 3);
+      if (px >= 0 && py >= 0 && px < s.w && py < s.h) d[py * s.w + px] = mix(d[py * s.w + px], edge, 1 - ph / 90);
+    }
+    return true;
+  } };
   def('PokemonTower5F', {
+    enter() { if (!G.ow.fx.includes(PURIFIED_FX)) G.ow.fx.push(PURIFIED_FX); return null; },
     step(x, y) {
       if (!PURIFIED.has(x + ',' + y)) { S.clear('EVENT_IN_PURIFIED_ZONE'); return null; }
       // inside the zone: always consume the step (no trainers, no encounters)

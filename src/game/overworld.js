@@ -81,7 +81,7 @@
       this.map = G.maps.getMap(name);
       S.map = name; S.x = x; S.y = y; S.dir = dir || S.dir;
       if (this.map.outdoor) { S.lastOutdoor = name; S.visited = S.visited || {}; if (G.FLY_SPOTS && G.FLY_SPOTS[name]) S.visited[name] = true; }
-      if (this.prevMapName !== name) { const pm = this.prevMapName && G.maps.cache[this.prevMapName]; if (pm && pm.overrides && (Object.keys(pm.overrides).length || (pm.passOverride && Object.keys(pm.passOverride).length))) { pm.overrides = {}; pm.passOverride = {}; delete MR.cache[pm.name]; } this.strength = false; this.flashed = false; }
+      if (this.prevMapName !== name) { const pm = this.prevMapName && G.maps.cache[this.prevMapName]; if (pm && pm.overrides && (Object.keys(pm.overrides).length || (pm.passOverride && Object.keys(pm.passOverride).length))) { pm.overrides = {}; pm.passOverride = {}; delete MR.cache[pm.name]; } if (this.map.outdoor) { this.strength = false; this.flashed = false; } } // FLASH and STRENGTH last until you're back outside, not just to the next floor
       this.prevMapName = name;
       this.autoPath = null;
       this.arrived = null; // set by doWarp: the way we came through a door or stairs, until the first step
@@ -329,7 +329,7 @@
         this.showBanner();
         this.camJump = true;
       }
-      if (this.pendingLand) { this.pendingLand = false; this.surfing = false; p.setSprite('red'); }
+      if (this.pendingLand) { this.pendingLand = false; this.surfing = false; p.setSprite('red'); if (G.music && G.mapMusic) G.music(G.mapMusic(this.map)); }
       S.x = p.x; S.y = p.y; S.dir = p.dir;
       if (G.afterStep && G.afterStep(this)) return;
       // poison hurts party Pokémon every 4 steps outside battle
@@ -373,7 +373,7 @@
         for (let k = 1; k <= range; k++) {
           const x = a.x + dx * k, y = a.y + dy * k;
           if (x === p.x && y === p.y) return { a, dist: k - 1 };
-          if (!this.map.passable(x, y) || this.actorAt(x, y, a)) break;
+          if (!(this.map.passable(x, y) || this.map.isWater(x, y)) || this.actorAt(x, y, a)) break; // swimmers see across the water
         }
       }
       return null;

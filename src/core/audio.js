@@ -220,11 +220,12 @@
   }
 
   let seq = null, jseq = null, seqTimer = null, pendingTrack = null;
+  // 'Song@tempo' plays a song at a fixed tempo, like pokered's alternate-tempo channel pointers (the slow CITIES1)
   function newSeq(id) {
-    const M = G.MUSIC, sd = M && M.songs[id]; if (!sd) return null;
+    const M = G.MUSIC, [base, alt] = String(id).split('@'), sd = M && M.songs[base]; if (!sd) return null;
     initBus();
     const out = bus.ch.map(b => { const g = ctx.createGain(); g.connect(b); return g; });
-    return { id, prog: M.progs[sd.f], tempo: 256, frame: 0, t0: ctx.currentTime + 0.05, out, tower: /Tower/.test(id),
+    return { id, prog: M.progs[sd.f], tempo: 256, fixedTempo: +alt || 0, frame: 0, t0: ctx.currentTime + 0.05, out, tower: /Tower/.test(id),
       chans: sd.ch.map((pc, i) => ({ n: sd.n[i], pc, stack: [], loops: {}, oct: 4, speed: 12, vol: 12, fade: 0, duty: 2, vib: null, pp: false, delay: 1, frac: 0, done: false, wave: 0, slide: null, last: null })) };
   }
   function releaseSeq(s, at) {
@@ -252,7 +253,7 @@
         case 3: c.speed = op[1]; c.vol = op[2]; c.fade = op[3]; if (c.n === 2) c.wave = op[3]; break;
         case 4: c.speed = op[1]; break; // drum_speed shares the note-speed register
         case 5: { const fr = noteFrames(s, c, op[2]); c.delay = fr; const segs = G.MUSIC.drums[op[1]]; if (segs) drumVoice(s, c, out, t, segs, op[1]); return; }
-        case 6: s.tempo = op[1]; for (const k of s.chans) k.frac = 0; break;
+        case 6: s.tempo = s.fixedTempo || op[1]; for (const k of s.chans) k.frac = 0; break;
         case 7: c.duty = op[1]; break;
         case 8: c.vib = [op[1], op[2], op[3]]; break;
         case 9: c.slide = [op[1], op[2], op[3]]; break;
