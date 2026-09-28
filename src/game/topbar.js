@@ -47,11 +47,30 @@
   }
   let counted = false; try { counted = !!sessionStorage.getItem('levyst_hit'); sessionStorage.setItem('levyst_hit', '1'); } catch (e) {}
   const apiBase = ((document.querySelector('meta[name="subscribe-endpoint"]') || {}).content || 'api/subscribe').replace(/subscribe$/, '');
+  // the wheels roll up to each new number, like the counter ticking over as someone arrives
+  let shown = null, target = 0, roll = 0;
+  function rollTo(n) {
+    if (shown !== null && n <= target) return;
+    const from = shown === null ? Math.max(0, n - 24) : shown, dur = shown === null ? 900 : 700, t0 = performance.now(), id = ++roll;
+    target = n;
+    (function tick(now) {
+      if (id !== roll) return; // a newer number took over mid-roll
+      const k = Math.min(1, (now - t0) / dur);
+      shown = Math.round(from + (n - from) * (1 - Math.pow(1 - k, 3))); drawHits(shown);
+      if (k < 1) requestAnimationFrame(tick);
+    })(t0);
+  }
+  // count this visit, then keep checking while the page is open (paused in background tabs) so new visitors show up live
+  const POLL_MS = 5000;
+  let poller = null;
+  const poll = () => fetch(apiBase + 'hits').then(r => r.json()).then(j => { if (j && j.ok) rollTo(j.hits); }).catch(() => {});
+  const startPolling = () => { if (!poller && !document.hidden) poller = setInterval(poll, POLL_MS + Math.floor(Math.random() * 1000)); };
+  const stopPolling = () => { clearInterval(poller); poller = null; };
   fetch(apiBase + (counted ? 'hits' : 'hit'), { method: counted ? 'GET' : 'POST' }).then(r => r.json()).then(j => {
-    if (!j || !j.ok) return;
-    // roll the wheels up to the number, like the counter is ticking over as you arrive
-    const end = j.hits, start = Math.max(0, end - 24), t0 = performance.now();
-    (function tick(now) { const k = Math.min(1, (now - t0) / 900); drawHits(Math.round(start + (end - start) * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(tick); })(t0);
+    if (!j || !j.ok) return; // no site server here (static hosting): no counter
+    rollTo(j.hits);
+    startPolling();
+    document.addEventListener('visibilitychange', () => { if (document.hidden) stopPolling(); else { poll(); startPolling(); } });
   }).catch(() => {});
 
   function done(text) { form.hidden = true; msg.textContent = text; msg.hidden = false; bar.classList.add('subbed'); }
