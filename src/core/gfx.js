@@ -117,6 +117,9 @@
     rect(x, y, w, h, c) {
       x |= 0; y |= 0; w |= 0; h |= 0;
       let x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(this.w, x + w), y1 = Math.min(this.h, y + h);
+      // nothing on screen: stop here. TypedArray.fill counts a negative end from the END of the buffer, so a rect off
+      // the left edge on row 0 used to flood the whole screen (the Social Zone's neon signs as the camera scrolled)
+      if (x1 <= x0 || y1 <= y0) return;
       for (let yy = y0; yy < y1; yy++) this.data.fill(c, yy * this.w + x0, yy * this.w + x1);
     }
     rectBlend(x, y, w, h, c, t) {

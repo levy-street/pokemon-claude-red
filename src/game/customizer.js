@@ -53,6 +53,12 @@
     ];
   }
   const pick = a => a[Math.floor(Math.random() * a.length)];
+  // the face alone barely shows at sprite size, so LOOK also swaps the default silhouette: GIRL trades the cap,
+  // short hair and pants for long hair and a dress, BOY trades them back. Anything already customised stays.
+  function applyFace(look) {
+    if (look.face === 'f') { if (['cap', 'spiky', 'short', 'bald'].includes(look.head)) look.head = 'long'; if (look.outfit === 'pants') look.outfit = 'dress'; }
+    else { if (['long', 'pony', 'bun'].includes(look.head)) look.head = 'cap'; if (look.outfit === 'dress') look.outfit = 'pants'; }
+  }
   function randomLook() {
     const face = pick(['m', 'f']);
     return { face, head: pick(face === 'f' ? ['long', 'pony', 'bun', 'cap', 'short', 'beanie', 'hat'] : HEADS), skin: pick(SKIN), hair: pick(HAIR), hat: pick(HAT),
@@ -87,6 +93,7 @@
       else if ((I.left || I.right) && r.vals && !r.off) {
         const i = Math.max(0, r.vals.indexOf(this.look[r.key])), n = r.vals.length;
         this.look[r.key] = r.vals[(i + (I.right ? 1 : -1) + n) % n];
+        if (r.key === 'face') applyFace(this.look);
         G.applyLook(this.look); this.bump = 6;
         G.sfx && G.sfx('blip');
       } else if (I.a) {

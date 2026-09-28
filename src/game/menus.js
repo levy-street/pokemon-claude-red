@@ -120,6 +120,11 @@
       }
       if (I.repeat('left')) cx = (cx + 8) % 9; if (I.repeat('right')) cx = (cx + 1) % 9;
       if (I.repeat('up')) cy = (cy + rows.length) % (rows.length + 1); if (I.repeat('down')) cy = (cy + 1) % (rows.length + 1);
+      // letters typed on a keyboard go straight in (the grid still works with arrows, taps and a pad)
+      for (const ch of (I.takeTyped ? I.takeTyped() : [])) {
+        if (ch === '\b') del();
+        else if (name.length < max) { if (nb) nb.add(name.length, ch); name += ch; if (name.length >= max) { cy = rows.length; cx = 5; } }
+      }
       if (I.pressed.b) del();
       if (I.pressed.start) { this.done = true; }
       if (I.pressed.a) {
@@ -137,7 +142,8 @@
       G.ui.text(s, 'DEL', 60, y); G.ui.text(s, 'END', 200, y);
       if (cy === rows.length) G.ui.cursor(s, cx < 4 ? 50 : 190, y, this.t);
     } };
-    yield* G.engine.run(scene);
+    if (G.input.setTextMode) G.input.setTextMode(true);
+    try { yield* G.engine.run(scene); } finally { if (G.input.setTextMode) G.input.setTextMode(false); }
     G.lastNameBuf = nb ? nb.bytes() : null;
     return name.trim() || def;
   };

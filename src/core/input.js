@@ -33,7 +33,13 @@
   // typing in the page's own fields (the email signup) must not walk the player or get swallowed
   const typing = e => { const t = e.target; return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); };
   const onChrome = e => !!(e.target && e.target.closest && e.target.closest('[data-chrome]'));
+  // naming screens: printable keys type into a queue instead of acting as buttons (W is a W, not "up")
+  let textMode = false; const typedQ = [];
   function onKey(e, v) {
+    if (textMode && v && !typing(e) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key && e.key.length === 1 && /[A-Za-z0-9 ]/.test(e.key)) { typedQ.push(e.key); e.preventDefault(); return; }
+      if (e.key === 'Backspace') { typedQ.push('\b'); e.preventDefault(); return; }
+    }
     const b = KEYMAP[e.code];
     if (!b || (v && typing(e))) return;
     raw[b] = v;
@@ -108,6 +114,8 @@
   function clear() { BTN.forEach(b => { pressed[b] = false; }); }
 
   function touchSet(b, on) { touch[b] = on; if (on) pulse[b] = true; }
-  G.input = { down, pressed, released, held, update, repeat, dir, clear, injected, BTN, pointerFallback, touchSet };
+  function setTextMode(on) { textMode = !!on; typedQ.length = 0; }
+  function takeTyped() { return typedQ.splice(0); }
+  G.input = { down, pressed, released, held, update, repeat, dir, clear, injected, BTN, pointerFallback, touchSet, setTextMode, takeTyped };
   G.pointer = pointer;
 })(window.G);

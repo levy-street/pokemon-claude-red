@@ -1,7 +1,7 @@
 // Overworld: player/NPC movement, map connections, warps, interaction and rendering.
 (function (G) {
   'use strict';
-  const { Surface, rgb, hash2 } = G.gfx;
+  const { Surface, rgb, hash2, mix, mul } = G.gfx;
   const MR = G.mapRender;
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   // data/tilesets/warp_carpet_tile_ids.asm and the maps/tilesets ExtraWarpCheck tests them on
@@ -505,16 +505,30 @@
       s.ellipseMul(x + 8, y + 14, a.jump ? 4 : 5.5, 2, SHADOW);
       const fr = a.frame();
       const oy = fr.h - 16, ox = (fr.w - 16) >> 1;
-      // reflection on water below
-      if (this.map.outdoor) {
+      // reflection in the water below (shore cells are half land, and the sprite is taller than a cell)
+      if (this.map.outdoor && !a.jump && !(a.isPlayer && this.surfing)) {
         const below = this.map.labelAt(Math.floor((a.px + 8) / 16), Math.floor(a.py / 16) + 1);
-        if (below === 'water' && !a.jump && !(a.isPlayer && this.surfing)) s.blit(fr, x, y + 16, { flipY: true, alpha: 0.35, sy: 0, sh: fr.h, mul: rgb(150, 190, 255) });
+        if (below === 'water') this.reflect(s, fr, x - ox, y + 16, cx, cy);
       }
       if (G.drawRideUnder) G.drawRideUnder(s, a, x, y + jy);
       const clip = G.rideClip ? G.rideClip(a) : 0;
       if (clip) s.blit(fr, x - ox, y - oy + jy + (a.bob || 0) + Math.round(Math.sin(G.frame / 10)) + 1, { sh: 17 }); // upper body riding the mount
       else s.blit(fr, x - ox, y - oy + jy + (a.bob || 0));
       if (G.drawRideOver) G.drawRideOver(s, a, x, y + jy);
+    }
+    // flipped, faint and blue, drawn only onto pixels the map renderer painted as water (its animation mask), so a
+    // reflection never lands on the sand or grass half of a shore cell or spills past the water's edge
+    reflect(s, fr, dx, dy, cx, cy) {
+      const R = this.render, M = R.wmask, ox = MR.MX * 16 + cx, oy = MR.MY * 16 + cy, d = s.data, src = fr.data, TINT = rgb(150, 190, 255);
+      for (let j = 0; j < fr.h; j++) {
+        const sy = dy + j, ry = sy + oy; if (sy < 0 || sy >= s.h || ry < 0 || ry >= R.H) continue;
+        const row = (fr.h - 1 - j) * fr.w;
+        for (let i = 0; i < fr.w; i++) {
+          const c = src[row + i], sx = dx + i, rx = sx + ox;
+          if (!(c >>> 24) || sx < 0 || sx >= s.w || rx < 0 || rx >= R.W || !M[ry * R.W + rx]) continue;
+          const k = sy * s.w + sx; d[k] = mix(d[k], mul(c, TINT), 0.35);
+        }
+      }
     }
     drawGrassFront(s, a, cx, cy) {
       if (a.jump) return;
