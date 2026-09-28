@@ -216,7 +216,12 @@
       m.leveledInBattle = false;
     }
     ow.locks--;
-    if (result === 'lose') { if (opts.noBlackout) return result; yield* blackout(); }
+    if (result === 'lose') {
+      if (opts.noBlackout) return result;
+      const foe = opts.enemyParty || [], lead = Math.max(0, ...G.state.party.map(m => m.level)); // analytics: who beat the player, and where
+      G.track && G.track('blackout', { at: ow.map.name, foe: opts.trainer ? opts.trainer.cls : foe[0] && foe[0].species, foeLv: Math.max(0, ...foe.map(m => m.level)), my: lead, wild: opts.type === 'wild' });
+      yield* blackout();
+    }
     return result;
   }
   G.runBattle = runBattle;

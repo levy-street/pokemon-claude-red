@@ -150,7 +150,7 @@
         const seen = new Set(m.players.map(p => p.id));
         for (const [id, g] of ghosts) if (!seen.has(id)) { removeActor(g); ghosts.delete(id); }
         for (const p of m.players) { const g = addGhost(p); g.path = [[p.x, p.y, p.d]]; g.s = p.s; }
-        if (fresh) { chat.length = 0; for (const c of m.chat || []) line(c.sys ? { sys: true, text: c.text } : { name: c.name, id: c.id, text: c.text }); }
+        if (fresh) { chat.length = 0; for (const c of m.chat || []) line(c.sys ? { sys: true, text: c.text } : { name: c.name, id: c.id, text: c.text }); G.track && G.track('lounge', { a: 'enter', online: m.players.length + 1, room: m.room }); }
         if (net.mode === 'ws') flush();
         break;
       }
@@ -348,7 +348,7 @@
     chatEl.addEventListener('submit', e => {
       e.preventDefault();
       const text = input.value.trim(); input.value = '';
-      if (text && net.state === 'online') send({ t: 'say', text });
+      if (text && net.state === 'online') { send({ t: 'say', text }); G.track && G.track('lounge', { a: 'chat' }); }
       closeChat();
     });
     input.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closeChat(); } e.stopPropagation(); });
@@ -394,6 +394,7 @@
     const ref = Math.random().toString(36).slice(2, 10);
     outgoing = { ref, id: null, to: g.id, name: g.name, kind, result: null };
     send(Object.assign({ t: 'offer', to: g.id, kind, ref }, payload));
+    G.track && G.track('lounge', { a: 'offer', kind });
     const o = outgoing;
     const r = yield* G.engine.run(waitScene(waitText, () => o.result, () => { if (!o.cancelled) { o.cancelled = true; if (o.id) send({ t: 'cancel', id: o.id }); } }));
     if (outgoing === o) outgoing = null;
@@ -430,6 +431,7 @@
     yield* G.tradeAnimation(mine, theirs);
     s.trades++;
     G.achieve('trade_' + id, 'trade', { sp: theirs.species, from: mine.species, name: from });
+    G.track && G.track('lounge', { a: 'trade', got: theirs.species, gave: mine.species });
     yield* SI.receive(theirs);
     yield* say('Trade complete! Take good care of ' + theirs.name + '!');
   }
@@ -440,7 +442,7 @@
       const team = yield* SI.pickTeam(Math.min(3, G.state.party.length), 'Battle ' + o.name + ' with');
       if (!team) { send({ t: 'answer', id: o.id, ok: false }); return; }
       if (trades[o.id] && trades[o.id].stage === 'cancel') { yield* say(o.name + ' is no longer waiting.'); return; }
-      send({ t: 'answer', id: o.id, ok: true, team: team.map(m => SI.monOut(m, false)) });
+      G.track && G.track('lounge', { a: 'accept', kind: o.kind }); send({ t: 'answer', id: o.id, ok: true, team: team.map(m => SI.monOut(m, false)) });
       const r = yield* G.engine.run(waitScene('Linking with ' + o.name, () => (pendingBattle && !pendingBattle.taken && pendingBattle.foe.id === o.from && { battle: pendingBattle }) || (trades[o.id] && trades[o.id].stage === 'cancel' && { msg: o.name + ' is no longer waiting.' })));
       if (r.battle) yield* pvpBattle(r.battle); else yield* say(r.msg);
       return;
@@ -451,7 +453,7 @@
     if (!(yield* G.ask('Trade one of your POKéMON for ' + theirs.name + '?'))) { send({ t: 'answer', id: o.id, ok: false }); return; }
     const pick = yield* SI.pickTeam(1, 'Trade which POKéMON?');
     if (!pick) { send({ t: 'answer', id: o.id, ok: false }); return; }
-    send({ t: 'answer', id: o.id, ok: true, mon: SI.monOut(pick[0], false) });
+    G.track && G.track('lounge', { a: 'accept', kind: o.kind }); send({ t: 'answer', id: o.id, ok: true, mon: SI.monOut(pick[0], false) });
     const r = yield* G.engine.run(waitScene('Waiting for ' + o.name + ' to accept', () => { const m = trades[o.id]; return m && m.stage !== 'wait' && m; }));
     if (r.stage !== 'done') { yield* say(r.why === 'timeout' || r.why === 'gone' ? o.name + ' is no longer waiting.' : o.name + ' called off the trade.'); return; }
     yield* doTrade(pick[0], r.mon, o.name, r.mid);
@@ -569,6 +571,7 @@
         transition: 'boss', music: 'gym_leader', noBlackout: true, noExp: true, noItems: true, noBadgeBoost: true, p2Action: lk.p2Action, pvp: lk });
     } finally { st.party = saved; lk.done = true; if (link === lk) link = null; }
     send({ t: 'end', mid: m.mid, r: res });
+    G.track && G.track('link_battle', { r: res, mine: mine.map(x => x.species), foe: foes.map(x => x.species), resyncs: lk.resyncs });
     if (res === 'win') { s.pvpWins++; G.achieve('pvp_live_' + foe.name, 'pvp', { name: foe.name, team: foes.map(x => x.species) }); yield* say('You won the link battle against ' + foe.name + '!\fLink battle record: ' + s.pvpWins + ' - ' + s.pvpLosses); }
     else if (res === 'lose') { s.pvpLosses++; yield* say(foe.name + ' won this time. Rematch?\fLink battle record: ' + s.pvpWins + ' - ' + s.pvpLosses); }
   }
@@ -618,6 +621,7 @@
         if (!team) continue;
         if (net.state !== 'online') { yield* say('The link dropped. Try again in a moment!'); return; }
         send({ t: 'queue', on: true, team: team.map(m => SI.monOut(m, false)) }); queuedAt = Date.now();
+        G.track && G.track('lounge', { a: 'queue', waiting: queueN });
         yield* say("You're in the queue!" + (queueN > 0 ? ' ' + queueN + (queueN === 1 ? ' trainer is' : ' trainers are') + ' waiting.' : '') + "\fFeel free to walk around. Your battle starts as soon as someone's ready.");
         return;
       }

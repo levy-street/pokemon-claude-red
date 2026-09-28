@@ -350,7 +350,7 @@
         const n = s.streak + 1, foe = towerTrainer(n), boss = n % 7 === 0;
         yield* say('Battle No.' + n + (boss ? ' - a TOWER TYCOON challenge!' : '!') + '\f' + foe.title + ' wants to battle!');
         const res = yield* linkBattle(team, foe.party, { cls: foe.cls, displayName: foe.title, winText: foe.title + ': You earned that win!', loseText: foe.title + ': The TOWER is tougher than it looks!', music: boss ? 'gym_leader' : 'trainer', boss });
-        if (res !== 'win') { yield* say('Your streak ended at ' + s.streak + '.\fBest streak: ' + s.best + '. Train up and come back!'); s.streak = 0; return; }
+        if (res !== 'win') { G.track && G.track('tower', { streak: s.streak, best: s.best, team: team.map(m => m.species) }); yield* say('Your streak ended at ' + s.streak + '.\fBest streak: ' + s.best + '. Train up and come back!'); s.streak = 0; return; }
         s.streak++; s.towerWins++; s.best = Math.max(s.best, s.streak);
         const bp = 1 + (s.streak % 7 === 0 ? 3 : 0); s.bp += bp;
         G.sfx && G.sfx('get_item');

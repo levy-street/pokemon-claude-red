@@ -203,6 +203,13 @@ everything in one SQLite file under `data/`. It also runs the live Social Zone (
 offers and the link battle relay, kept in memory and sent over WebSockets, with long polling as a fallback. Passwords are stored only as salted scrypt hashes, and session tokens only
 as SHA-256 hashes.
 
+The game also sends a small, anonymous gameplay log (`src/game/analytics.js`): every shareable moment (badges, catches,
+evolutions, the Hall of Fame, Tower streaks, link battles, trades), first visits to towns and dungeons, blackouts,
+saves, quiz scores, shares and a heartbeat. Each save and each browser gets a random id; there are no emails, and the
+server keeps a visitor's country but never their IP address. Browsers that send Do Not Track or Global Privacy Control
+send nothing. `python3 tools/serve.py stats [days]` prints the report: where visitors come from, how far players get
+(a funnel from starter to Champion), where they stop and black out, what they catch and share, and a leaderboard.
+
 Newsletter sign-ups are kept locally, then forwarded to the Levy Street list. If the page is hosted without the
 server, it signs up with the list directly. `python3 tools/serve.py export` prints the email list as CSV, and
 `python3 tools/serve.py sync-newsletter` retries any sign-up the list hasn't accepted yet.

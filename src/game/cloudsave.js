@@ -78,6 +78,7 @@
       return fail(r.error === 'wrong' ? 'Wrong email or password.' : r.error === 'weak password' ? 'Use at least 8 characters for the password.' : r.status === 429 ? 'Too many tries. Give it a few minutes.' : r.error === 'invalid email' ? 'That email looks off.' : 'Couldn’t reach the server. Try again in a moment.');
     }
     acct = { token: r.token, email: r.email, synced: null, cloudAt: r.saveAt || null }; keep();
+    G.track && G.track('account', { mode });
     close('in');
   });
 

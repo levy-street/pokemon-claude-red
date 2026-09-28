@@ -9,6 +9,8 @@
     const ow = G.ow = new G.Overworld();
     G.engine.push(ow);
     ow.load(G.state.map, G.state.x, G.state.y, G.state.dir);
+    const S = G.state; // analytics (src/game/analytics.js): a fresh adventure, or a save picked up again
+    if (G.track && !param('map')) G.track(S.party.length || S.playTime ? 'continue' : 'new_game', { name: S.name, rival: S.rival, face: (S.look && S.look.face) || 'm', hof: (S.hallOfFame || []).length });
     return ow;
   };
   G.boot = function () {

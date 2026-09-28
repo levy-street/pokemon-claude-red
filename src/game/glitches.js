@@ -126,7 +126,7 @@
   // ---------------- Pokédex #000: the flag lives on the 6th item's quantity, and the sprite lands on the HALL OF FAME ----------------
   function flag000(sp) {
     const S = G.state, b = S && S.bag;
-    if (b && b.length >= 6 && b[5].n < 128) b[5].n += 128;
+    if (b && b.length >= 6 && b[5].n < 128) { b[5].n += 128; G.track && G.track('glitch', { what: 'item128', item: b[5].id }); }
     const d = G.DATA.species[sp];
     if (d && d.glitch && d.glitch.look === 'block' && GS().hofBefore === undefined) GS().hofBefore = (S.hallOfFame || []).length;
   }
@@ -239,7 +239,7 @@
     } else if (a && G.talkTo) yield* G.talkTo(a);
     const cls = g.enemy ? g.enemy.spc : 0, set = g.enemy ? g.enemy.atk : 0;
     if (cls >= 200) { const tc = TRAINERS[cls - 200]; if (tc && G.DATA.parties[tc]) yield* G.startTrainerBattle(tc, Math.max(1, set), {}); }
-    else if (cls > 0) yield* G.startWildBattle(speciesFor(cls), set);
+    else if (cls > 0) { G.track && G.track('glitch', { what: 'trainer_fly', sp: speciesFor(cls), lv: set }); yield* G.startWildBattle(speciesFor(cls), set); }
     G.setFlag(esc.flag); // EndTrainerBattle marks the trainer who spotted you as fought
     g.seenLock = false;
   }

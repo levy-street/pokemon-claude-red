@@ -4,10 +4,12 @@
 #   POST /api/hit, GET /api/hits  the late-90s hit counter
 #   POST /api/account/signup|login|logout, GET|PUT /api/save   accounts + cloud saves (src/game/cloudsave.js)
 #   /api/lounge/*                 the live SOCIAL ZONE: presence, chat, offers, link battles (tools/lounge.py, in memory)
+#   POST /api/events              anonymous gameplay analytics (src/game/analytics.js)
 #
 #   python3 tools/serve.py [port] [web dir]      serve (default 8784, dist/)
 #   python3 tools/serve.py export                print the email list (bar signups + opted-in accounts) as CSV
 #   python3 tools/serve.py sync-newsletter       re-send any signup the newsletter didn't accept yet
+#   python3 tools/serve.py stats [days]          gameplay report: visitors, the progress funnel, milestones, leaderboard
 #
 # Newsletter: every signup is kept here first, then forwarded to the Levy Street list on Notifuse in the background
 # (NEWSLETTER_URL / NEWSLETTER_WORKSPACE / NEWSLETTER_LIST override the defaults below; its status is in `synced`).
@@ -15,7 +17,7 @@
 # Passwords are never stored: only a salted scrypt hash (n=2^17, r=8, p=1, the OWASP minimum). Sessions are random
 # 256-bit tokens held by the browser; the server keeps only their SHA-256. The database sits outside the web root,
 # is git-ignored, and nothing here reads emails back over HTTP.
-import base64, csv, hashlib, hmac, http.server, json, os, re, secrets, sqlite3, sys, threading, time, urllib.error, urllib.request
+import base64, collections, csv, hashlib, hmac, http.server, json, os, re, secrets, sqlite3, statistics, sys, threading, time, urllib.error, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.environ.get('CLAUDERED_DB', os.path.join(ROOT, 'data', 'claudered.db'))
@@ -42,7 +44,18 @@ def connect():
         id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, pw TEXT NOT NULL, created_at TEXT NOT NULL, source TEXT);
       CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, account INTEGER NOT NULL, created_at REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS saves (account INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);''')
+      CREATE TABLE IF NOT EXISTS counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS events (   -- gameplay analytics: no emails, no IP addresses
+        id INTEGER PRIMARY KEY,
+        at TEXT NOT NULL,         -- UTC, when the server got it
+        bid TEXT, sid TEXT,       -- random browser id, random page-load id
+        pid TEXT,                 -- random id of the save (it travels with cloud saves and transfers)
+        kind TEXT NOT NULL,       -- open, new_game, continue, moment, area, blackout, save, ping, share, ... (KINDS)
+        map TEXT, badges INTEGER, dex INTEGER, playtime INTEGER,  -- where the player was: map, badges, Pokémon caught, minutes played
+        data TEXT,                -- the event's details, JSON
+        country TEXT);            -- from Cloudflare's CF-IPCountry
+      CREATE INDEX IF NOT EXISTS events_pid ON events (pid);
+      CREATE INDEX IF NOT EXISTS events_kind ON events (kind, at);''')
     if 'synced' not in [r[1] for r in db.execute('PRAGMA table_info(subscribers)')]:
         db.execute('ALTER TABLE subscribers ADD COLUMN synced TEXT')  # newsletter status: NULL = not sent yet, 'ok', or the error
     db.commit(); return db
@@ -56,6 +69,116 @@ def send_to_newsletter(email):
     except urllib.error.HTTPError as e: return f'http {e.code}: ' + e.read(200).decode('utf-8', 'replace')
     except Exception as e: return 'error: ' + str(e)[:200]
 
+# ---------------------------------------------------------------- gameplay analytics
+KINDS = {'open', 'new_game', 'continue', 'save', 'ping', 'bye', 'moment', 'share', 'area', 'blackout', 'glitch', 'quiz', 'account', 'lounge', 'link_battle', 'tower', 'error'}
+EV_ID = re.compile(r'^[A-Za-z0-9]{6,24}$')
+def event_rows(d, country):
+    """validate a batch from src/game/analytics.js -> rows for the events table"""
+    bid, sid = str(d.get('bid', '')), str(d.get('sid', ''))
+    if not EV_ID.match(bid) or not EV_ID.match(sid): return []
+    def n(v, hi):
+        try: return max(0, min(hi, int(v)))
+        except Exception: return None
+    rows, at = [], now_iso()
+    for e in (d.get('ev') if isinstance(d.get('ev'), list) else [])[:40]:
+        if not isinstance(e, dict) or e.get('k') not in KINDS: continue
+        pid, data = str(e.get('pid') or ''), e.get('d')
+        data = json.dumps(data, separators=(',', ':')) if isinstance(data, dict) else None
+        if data and len(data) > 3000: data = json.dumps({'truncated': True})
+        rows.append((at, bid, sid, pid if EV_ID.match(pid) else None, e['k'], re.sub(r'[^A-Za-z0-9_]', '', str(e.get('map') or ''))[:40] or None,
+                     n(e.get('b'), 8), n(e.get('x'), 255), n(e.get('pt'), 10 ** 7), data, re.sub(r'[^A-Z]', '', str(country or ''))[:2] or None))
+    return rows
+
+# the adventure in order: a player's stage is the furthest step they're known to have reached
+STAGES = [('In the game', lambda p: True), ('Got a starter', lambda p: p['starter'] or p['dex'] > 0 or p['badges'] > 0),
+    ('Viridian City', 'ViridianCity'), ('Viridian Forest', 'ViridianForest'), ('Pewter City', 'PewterCity'), ('BOULDER BADGE', 1), ('Mt. Moon', 'MtMoon1F'),
+    ('Cerulean City', 'CeruleanCity'), ('CASCADE BADGE', 2), ('Vermilion City', 'VermilionCity'), ('S.S. Anne', 'SSAnne1F'), ('THUNDER BADGE', 3),
+    ('Lavender Town', 'LavenderTown'), ('Celadon City', 'CeladonCity'), ('4 badges', 4), ('Pokémon Tower', 'PokemonTower1F'), ('Saffron City / Silph Co.', 'SilphCo1F'),
+    ('Fuchsia City', 'FuchsiaCity'), ('5 badges', 5), ('6 badges', 6), ('Cinnabar Island', 'CinnabarIsland'), ('7 badges', 7), ('8 badges', 8),
+    ('Victory Road', 'VictoryRoad1F'), ('Indigo Plateau', 'IndigoPlateauLobby'), ('CHAMPION', lambda p: 'champion' in p['moments'] or p['hof'] > 0)]
+def stage_of(p):
+    best = 0
+    for i, (_, test) in enumerate(STAGES):
+        ok = test(p) if callable(test) else p['badges'] >= test if isinstance(test, int) else test in p['areas']
+        if ok: best = i
+    return best
+
+def stats(db, days):
+    since = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time() - days * 86400))
+    ev = [(at, bid, sid, pid, kind, mp, b, x, pt, json.loads(data) if data else {}, c) for at, bid, sid, pid, kind, mp, b, x, pt, data, c in
+          db.execute('SELECT at, bid, sid, pid, kind, map, badges, dex, playtime, data, country FROM events WHERE at >= ? ORDER BY id', (since,))]
+    if not ev: return print('No events yet.')
+    C = collections.Counter
+    top = lambda c, n=10: ', '.join(f'{k} {v}' for k, v in c.most_common(n)) or '-'
+    of = lambda kind: [e for e in ev if e[4] == kind]
+    head = lambda t: print('\n' + t + '\n' + '-' * len(t))
+    opens = of('open')
+    print(f'{len(ev)} events, {ev[0][0][:16]} to {ev[-1][0][:16]} UTC')
+    print(f'{len({e[1] for e in ev})} browsers, {len({e[2] for e in ev})} visits, {len({e[3] for e in ev if e[3]})} saves (players)')
+    head('Visits')
+    print('From:     ', top(C(e[9].get('ref') or 'direct' for e in opens)))
+    print('Countries:', top(C(e[10] or '?' for e in opens)))
+    print('Devices:  ', f"{sum(1 for e in opens if e[9].get('touch'))} touch, {sum(1 for e in opens if not e[9].get('touch'))} keyboard/mouse;",
+          f"{sum(1 for e in opens if e[9].get('returning'))} returning visits; landed on:", top(C(e[9].get('land') for e in opens if e[9].get('land'))))
+    print('Games:    ', len(of('new_game')), 'new games,', len(of('continue')), 'continues,', len(of('save')), 'saves,', len(of('account')), 'accounts made/logged in')
+
+    players = {}
+    for at, bid, sid, pid, kind, mp, b, x, pt, d, c in ev:
+        if not pid: continue
+        p = players.setdefault(pid, {'name': None, 'badges': 0, 'dex': 0, 'pt': 0, 'map': None, 'last': None, 'first': at, 'hof': 0, 'moments': set(), 'areas': set(), 'starter': None, 'lead': 0})
+        p['badges'], p['dex'], p['pt'] = max(p['badges'], b or 0), max(p['dex'], x or 0), max(p['pt'], pt or 0)
+        p['map'], p['last'] = mp or p['map'], at
+        if d.get('name'): p['name'] = d['name']
+        if d.get('lead'): p['lead'] = max(p['lead'], d['lead'])
+        if kind == 'area' and mp: p['areas'].add(mp)
+        if kind == 'moment':
+            p['moments'].add(d.get('kind')); p['moments'].add(d.get('id'))
+            if d.get('kind') == 'starter': p['starter'] = d.get('sp')
+            if d.get('kind') == 'hof': p['hof'] += 1
+    for p in players.values(): p['stage'] = stage_of(p)
+    head('How far players get (reached at least)')
+    n = len(players) or 1
+    furthest = max((p['stage'] for p in players.values()), default=0)
+    for i, (label, _) in enumerate(STAGES[:furthest + 2]):
+        k = sum(1 for p in players.values() if p['stage'] >= i)
+        print(f'  {label:26} {k:5}  {100 * k / n:5.1f}%  ' + '#' * round(40 * k / n))
+    head('Where players were last seen (not yet champion)')
+    print(' ', top(C(p['map'] for p in players.values() if p['stage'] < len(STAGES) - 1 and p['map']), 15))
+
+    moments = of('moment')
+    head('Milestones')
+    print('Moments:  ', top(C(e[9].get('kind') for e in moments), 20))
+    print('Starters: ', top(C(p['starter'] for p in players.values() if p['starter'])))
+    mins = collections.defaultdict(list)
+    for e in moments:
+        if e[9].get('kind') == 'leader' and e[8] is not None: mins[e[9].get('badge')].append(e[8])
+    for badge, v in sorted(mins.items(), key=lambda kv: statistics.median(kv[1])):
+        print(f'  {badge:14} {len(v):4} players, median {statistics.median(v) / 60:.1f} h of play')
+    print('Caught:   ', top(C(e[9].get('sp') for e in moments if e[9].get('kind') == 'caught'), 15))
+    print('Evolved:  ', top(C(e[9].get('sp') for e in moments if e[9].get('kind') == 'evolved'), 10))
+    hof = [e for e in moments if e[9].get('kind') == 'hof']
+    if hof: print('Hall of Fame teams:', top(C(sp for e in hof for sp in e[9].get('team', [])), 12))
+    head('Blackouts (where players lose)')
+    bl = of('blackout')
+    print(f'  {len(bl)} blackouts. By place and foe:', top(C(f"{e[9].get('at')} vs {e[9].get('foe')}" for e in bl), 12))
+    head('Sharing')
+    sh = of('share')
+    print(f'  {len(sh)} shares of {len(moments)} moments.', 'By moment:', top(C(e[9].get('kind') for e in sh)), '| How:', top(C(e[9].get('how') for e in sh)), '| Result:', top(C(e[9].get('result') for e in sh), 5))
+    head('Who\'s That Pokémon?, the SOCIAL ZONE, glitches')
+    q = of('quiz'); daily = [e[9].get('score', 0) for e in q if e[9].get('mode') == 'daily']
+    print(f'  Quiz: {len(q)} games; daily average {statistics.mean(daily):.1f}/10' if daily else f'  Quiz: {len(q)} games', '| best endless', max([e[9].get('score', 0) for e in q if e[9].get('mode') == 'endless'] or [0]))
+    print('  Lounge:', top(C(e[9].get('a') for e in of('lounge'))), '| link battles', len(of('link_battle')), '| tower runs', len(of('tower')),
+          '(best streak', max([e[9].get('best', 0) for e in of('tower')] or [0]), end=')\n')
+    print('  Glitches:', top(C(e[9].get('what') for e in of('glitch'))))
+    errs = of('error')
+    if errs: head(f'Errors ({len(errs)})'); [print('  ', v, 'x', k[:150].replace('\n', ' ')) for k, v in C(e[9].get('m', '') for e in errs).most_common(8)]
+    head('Leaderboard')
+    board = sorted(players.values(), key=lambda p: (p['stage'], p['badges'], p['dex'], p['pt']), reverse=True)[:15]
+    for i, p in enumerate(board, 1):
+        print(f"  {i:2}. {str(p['name'] or '?'):10} {STAGES[p['stage']][0]:24} badges {p['badges']}  caught {p['dex']:3}  best Lv {p['lead']:3}  {p['pt'] / 60:5.1f} h  last at {p['map']} {p['last'][:16]}")
+
+if len(sys.argv) > 1 and sys.argv[1] == 'stats':
+    stats(connect(), float(sys.argv[2]) if len(sys.argv) > 2 else 36500); sys.exit()
 if len(sys.argv) > 1 and sys.argv[1] == 'export':
     w = csv.writer(sys.stdout); w.writerow(['email', 'created_at', 'source', 'referrer', 'consent', 'synced'])
     w.writerows(connect().execute('SELECT email, created_at, source, referrer, consent, synced FROM subscribers ORDER BY created_at'))
@@ -189,6 +312,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split('?')[0].rstrip('/')
+        if path == '/api/events':  # analytics batches: about one every few seconds while someone plays
+            if not allow(('ev', self.ip()), 600, 3600): return self.reply(429, {'ok': False, 'error': 'too many tries'})
+            try: rows = event_rows(self.body(96 * 1024), self.headers.get('CF-IPCountry'))
+            except Exception: return self.reply(400, {'ok': False, 'error': 'bad request'})
+            with lock:
+                db.executemany('INSERT INTO events (at, bid, sid, pid, kind, map, badges, dex, playtime, data, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows); db.commit()
+            return self.reply(200, {'ok': True, 'n': len(rows)})
         if path in ('/api/lounge/hello', '/api/lounge/send'):
             try: d = self.body(lounge.MAX_MSG * 4)
             except Exception: return self.reply(400, {'ok': False, 'error': 'bad request'})
@@ -249,7 +379,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return self.reply(200, {'ok': True, 'token': self.new_session(row[0]), 'email': email, 'saveAt': saved and saved[0]})
 
     def log_message(self, fmt, *args):  # keep the log to API calls and errors, not every sprite script or lounge message
-        if self.path.startswith('/api/lounge/') and not (len(args) > 1 and str(args[1])[:1] == '5'): return
+        if (self.path.startswith('/api/lounge/') or self.path.startswith('/api/events')) and not (len(args) > 1 and str(args[1])[:1] == '5'): return
         if self.command in ('POST', 'PUT') or (len(args) > 1 and str(args[1])[:1] in '45'): super().log_message(fmt, *args)
 
 print(f'serving {WEB} on http://127.0.0.1:{PORT}  (data -> {DB})', flush=True)

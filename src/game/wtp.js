@@ -143,6 +143,7 @@
       else { this.best = st.best || 0; st.best = Math.max(st.best || 0, this.streak); this.newBest = this.streak > this.best && this.streak > 0; }
       save(st);
       this.phase = 'results'; this.pt = 0; this.sel = 0; this.msg = ''; this.msgT = 0;
+      G.track && G.track('quiz', { mode: this.mode, score: this.score(), day: this.day || null });
       this.menu = ['SHARE', 'COPY LINK', 'SAVE PNG', this.mode === 'daily' ? 'ENDLESS' : 'AGAIN', 'EXIT'];
       this.card = this.shareCard();
       G.music && G.music(this.score() >= (this.mode === 'daily' ? 7 : 10) ? 'DefeatedGymLeader' : 'DefeatedTrainer');
