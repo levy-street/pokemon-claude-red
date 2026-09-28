@@ -2,8 +2,11 @@
 (function (G) {
   'use strict';
   const D = () => G.DATA;
-  const rnd = n => Math.floor(Math.random() * n);
-  const chance = p => Math.random() < p;
+  // live link battles (src/game/lounge.js) swap in a seeded generator shared by both games, so the two copies of the
+  // battle roll the same numbers and stay in step with only the players' picks sent between them
+  let RNG = Math.random;
+  const rnd = n => Math.floor(RNG() * n);
+  const chance = p => RNG() < p;
   const STAGE = [25, 28, 33, 40, 50, 66, 100, 150, 200, 250, 300, 350, 400];
   const PHYSICAL = new Set(['NORMAL', 'FIGHTING', 'FLYING', 'POISON', 'GROUND', 'ROCK', 'BUG', 'GHOST', 'BIRD']);
   const HIGH_CRIT = new Set(['KARATE_CHOP', 'RAZOR_LEAF', 'CRABHAMMER', 'SLASH']);
@@ -55,6 +58,12 @@
 
     // ---------------- main loop ----------------
     *run(ui) {
+      const pvp = this.o.pvp;
+      if (!pvp) return yield* this.loop(ui);
+      const prev = RNG; RNG = pvp.rng;
+      try { return yield* this.loop(ui); } finally { RNG = prev; }
+    }
+    *loop(ui) {
       this.ui = ui;
       yield* ui.intro(this);
       if (!this.wild) this.participants.add(this.mon(this.p));
@@ -62,6 +71,10 @@
       for (;;) {
         this.turn++;
         const pAct = yield* this.playerAction();
+        if (pAct.type === 'run' && this.o.pvp) { // a link battle: RUN is giving up
+          if (yield* ui.askYesNo('Forfeit this battle?')) { this.o.pvp.forfeit(this); yield* ui.msg(G.state.name + ' forfeited the battle!'); return this.finish('lose'); }
+          this.turn--; continue;
+        }
         if (pAct.type === 'run') {
           const r = yield* this.tryRun();
           if (r) return this.finish('run');
@@ -72,10 +85,12 @@
         }
         if (pAct.type === 'caught') return this.finish('caught');
         if (pAct.type === 'fled') return this.finish('fled');
-        // a second human player picks the opponent's move in local versus battles
-        const eAct = this.o.p2Action ? (yield* this.o.p2Action(this)) : this.enemyAction();
+        // a second human player picks the opponent's move: local versus, or the other game in a link battle
+        const eAct = this.o.p2Action ? (yield* this.o.p2Action(this, pAct)) : this.enemyAction();
+        if (eAct.type === 'end') return yield* this.linkEnd(eAct); // the other player forfeited or the link dropped
         // switches & items first
         if (pAct.type === 'switch') yield* this.switchIn(this.p, pAct.index, true);
+        if (eAct.type === 'switch') { yield* ui.msg(this.trainer.displayName + ' sent out ' + this.e.party[eAct.index].name + '!', { auto: 16 }); yield* this.switchIn(this.e, eAct.index, true); }
         if (pAct.type === 'item' || pAct.type === 'safari') { /* already resolved */ }
         if (eAct.type === 'item') yield* this.enemyUseItem(eAct.item);
         let order;
@@ -102,6 +117,8 @@
       if (a !== b) return a > b ? [this.p, this.e] : [this.e, this.p];
       const sp = this.stat(this.p, 'spd'), se = this.stat(this.e, 'spd');
       if (sp !== se) return sp > se ? [this.p, this.e] : [this.e, this.p];
+      // a link battle's tie goes by the shared roll read as "host first", the same answer in both games
+      if (this.o.pvp) return chance(0.5) === this.o.pvp.host ? [this.p, this.e] : [this.e, this.p];
       return chance(0.5) ? [this.p, this.e] : [this.e, this.p];
     }
 
@@ -563,7 +580,7 @@
         }
         case 'MIMIC': {
           const opts = this.moveList(foe).map(x => x.id);
-          const pick = side.isPlayer ? (yield* ui.chooseMove(opts, 'Mimic which move?')) : opts[rnd(opts.length)];
+          const pick = side.isPlayer && !this.o.pvp ? (yield* ui.chooseMove(opts, 'Mimic which move?')) : opts[rnd(opts.length)];
           if (!pick) { yield* failed(); break; }
           const list = this.moveList(side); const slot = list.findIndex(x => x.id === 'MIMIC');
           if (slot >= 0) { v.mimic = { slot, old: list[slot] }; list[slot] = { id: pick, pp: list[slot].pp, max: list[slot].max, ups: 0, mimic: true }; }
@@ -635,6 +652,7 @@
         this.participants.delete(Pm);
       }
       if (!any) return false;
+      if (this.o.pvp) return yield* this.linkFaints();
       // player replacement
       if (this.p.fainted) {
         if (!this.p.party.some(m => m.hp > 0)) {
@@ -666,6 +684,34 @@
         yield* this.switchIn(this.e, next, false);
       }
       return true;
+    }
+
+    // link battles: both games settle the same way, whichever side they show at the bottom, and each player picks
+    // their own replacement (the other game waits for it)
+    *linkFaints() {
+      const ui = this.ui, pvp = this.o.pvp;
+      const pOut = this.p.fainted && !this.p.party.some(m => m.hp > 0), eOut = this.e.fainted && !this.e.party.some(m => m.hp > 0);
+      if (pOut && eOut) { yield* ui.msg('Both sides are out of usable POKéMON!'); yield* ui.msg('The battle is a draw!'); return this.finish('draw') || true; }
+      if (eOut) { yield* ui.trainerDefeated(this); return this.finish('win') || true; }
+      if (pOut) {
+        yield* ui.msg(G.state.name + ' is out of usable POKéMON!');
+        if (this.trainer.loseText) yield* ui.trainerSays(this.trainer.loseText);
+        return this.finish('lose') || true;
+      }
+      if (this.p.fainted) { const idx = yield* pvp.replace(this, 'p'); yield* this.switchIn(this.p, idx, false); }
+      if (this.e.fainted) {
+        const r = yield* pvp.replace(this, 'e');
+        if (typeof r === 'object') { yield* this.linkEnd(r); return true; }
+        yield* ui.msg(this.trainer.displayName + ' sent out ' + this.e.party[r].name + '!', { auto: 16 });
+        yield* this.switchIn(this.e, r, false);
+      }
+      return true;
+    }
+
+    *linkEnd(r) {
+      if (r.msg) yield* this.ui.msg(r.msg);
+      if (r.result === 'win') yield* this.ui.trainerDefeated(this);
+      return this.finish(r.result);
     }
 
     *switchIn(side, idx, withdraw) {

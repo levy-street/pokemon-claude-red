@@ -1,7 +1,8 @@
 // SOCIAL ZONE: one shared hangout reached from the CABLE CLUB receptionist in every POKéMON CENTER.
 // Battle Tower (level-50 win streaks, BP prizes), link battles against friends' teams (shared as links) and local
 // 2-player versus, two-way trades by link, a records board, a photographer and friends hanging out in the lounge.
-// No server: teams and trades travel as links/codes (validated on import), progress lives in G.state.social.
+// Teams and trades can travel as links/codes (validated on import); progress lives in G.state.social. The live lounge
+// (everyone online in one room, chat, real-time battles and trades) is src/game/lounge.js.
 (function (G) {
   'use strict';
   const { Surface, hex, mix, shade } = G.gfx;
@@ -598,7 +599,7 @@
     talk,
     sign: {
       SOCIAL_RECORDS: records,
-      SOCIAL_WELCOME: function* () { yield* say("SOCIAL ZONE\fBATTLE TOWER - LINK BATTLES - TRADE CORNER\fFriends' teams you add show up here in the lounge!"); },
+      SOCIAL_WELCOME: function* () { yield* say("SOCIAL ZONE\fBATTLE TOWER - LINK BATTLES - TRADE CORNER\fEveryone here is a real trainer: talk to anyone to battle or trade, or press SELECT for the list!"); },
       SOCIAL_PHOTO: function* () { yield* say('PHOTO SPOT: talk to the photographer to snap and share your TRAINER CARD.'); },
     },
   });
@@ -633,4 +634,5 @@
     return true;
   };
   G.socialAbsorb = absorb; G.refreshLounge = refreshLounge; G.socialTradeLink = tradeLink;
+  G.socialInternals = { ZONE, S, choose, monOut, monIn, lookIn, pickTeam, receive, talk };
 })(window.G);

@@ -121,13 +121,14 @@
     }
     actorAt(x, y, except) {
       for (const a of this.actors) {
-        if (a === except || a.hidden) continue;
+        if (a === except || a.hidden || a.ghost) continue; // other players never block the way
         if (a.x === x && a.y === y) return a;
         if (a.moving) { const tx = a.x + DIRS[a.mdir][0], ty = a.y + DIRS[a.mdir][1]; if (tx === x && ty === y) return a; }
       }
       if (this.player && this.player !== except && this.player.x === x && this.player.y === y) return this.player;
       return null;
     }
+    ghostAt(x, y) { return this.actors.find(a => a.ghost && !a.hidden && a.x === x && a.y === y) || null; }
     actorByKey(id) { return this.actors.find(a => a.obj && (a.obj.id === id)); }
     // can `who` step from (x,y) in dir? returns {ok, jump, water, conn}
     canMove(who, dir) {
@@ -191,6 +192,7 @@
       const S = G.state;
       if (S) S.playTime++;
       for (const a of this.actors) {
+        if (a.ghost) continue; // other players in the live lounge walk on the network's clock (src/game/lounge.js)
         const arrived = a.update();
         if (!a.moving && a.obj && !this.locks && focused && !a.scripted) this.npcIdle(a);
       }
@@ -269,7 +271,7 @@
         if (path !== null) go(path + out, null, [ex, ey]);
         return;
       }
-      const actor = this.actorAt(tx, ty, p);
+      const actor = this.actorAt(tx, ty, p) || this.ghostAt(tx, ty);
       if (!actor && m.passable(tx, ty)) {
         const path = S.findPath(p, tx, ty);
         const edgeWarp = m.warpAt(tx, ty) >= 0 && (!m.isWarpTile(tx, ty) || ['down', 'up', 'left', 'right'].some(d => this.pushWarp(tx, ty, d)));
@@ -374,7 +376,7 @@
     interact() {
       const p = this.player, [dx, dy] = DIRS[p.dir];
       let fx = p.x + dx, fy = p.y + dy;
-      let a = this.actorAt(fx, fy, p);
+      let a = this.actorAt(fx, fy, p) || this.ghostAt(fx, fy);
       const m = this.map;
       // talk over counters
       if (!a && m.ts.counters.includes(m.tile(fx, fy))) { a = this.actorAt(fx + dx, fy + dy, p); }

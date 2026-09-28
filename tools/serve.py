@@ -3,6 +3,7 @@
 #   POST /api/subscribe           email signup from the Levy St. bar (src/game/topbar.js), forwarded to the newsletter
 #   POST /api/hit, GET /api/hits  the late-90s hit counter
 #   POST /api/account/signup|login|logout, GET|PUT /api/save   accounts + cloud saves (src/game/cloudsave.js)
+#   /api/lounge/*                 the live SOCIAL ZONE: presence, chat, offers, link battles (tools/lounge.py, in memory)
 #
 #   python3 tools/serve.py [port] [web dir]      serve (default 8784, dist/)
 #   python3 tools/serve.py export                print the email list (bar signups + opted-in accounts) as CSV
@@ -80,6 +81,9 @@ def check_pw(pw, stored):
 DUMMY = hash_pw(secrets.token_hex(8))  # checked when the email is unknown, so a wrong email takes as long as a wrong password
 tok_hash = lambda t: hashlib.sha256(t.encode()).hexdigest()
 
+import lounge  # after the CLI commands above: it starts the lounge's clock thread
+from urllib.parse import parse_qs
+
 WEB = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.join(ROOT, 'dist')
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8784
 db, lock, limits, recent = connect(), threading.Lock(), threading.Lock(), {}
@@ -135,6 +139,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split('?')[0].rstrip('/')
+        if path == '/api/lounge/ws':
+            if 'websocket' not in (self.headers.get('Upgrade') or '').lower() or not self.headers.get('Sec-WebSocket-Key'): return self.reply(400, {'ok': False})
+            if not allow(('lounge', self.ip()), 30, 60): return self.reply(429, {'ok': False, 'error': 'too many tries'})
+            self.close_connection = True
+            self.wfile.write(('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '
+                              + lounge.ws_accept(self.headers['Sec-WebSocket-Key']) + '\r\n\r\n').encode())
+            try: lounge.serve_ws(self, self.ip())
+            except Exception: pass
+            return
+        if path == '/api/lounge/poll':
+            q = parse_qs(self.path.partition('?')[2])
+            try: since = int((q.get('since') or ['0'])[0])
+            except ValueError: since = 0
+            out = lounge.poll((q.get('k') or [''])[0], since)
+            if out is None: return self.reply(410, {'ok': False, 'error': 'gone'})
+            body = out.encode()
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
         if path == '/api/hits':
             with lock: row = db.execute("SELECT value FROM counters WHERE name = 'hits'").fetchone()
             return self.reply(200, {'ok': True, 'hits': row[0] if row else 0})
@@ -166,6 +189,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split('?')[0].rstrip('/')
+        if path in ('/api/lounge/hello', '/api/lounge/send'):
+            try: d = self.body(lounge.MAX_MSG * 4)
+            except Exception: return self.reply(400, {'ok': False, 'error': 'bad request'})
+            if path == '/api/lounge/hello':
+                if not allow(('lounge', self.ip()), 30, 60): return self.reply(429, {'ok': False, 'error': 'too many tries'})
+                return self.reply(200, lounge.poll_hello(d, self.ip()))
+            ok = lounge.poll_send(str(d.get('k', '')), d.get('m') if isinstance(d.get('m'), list) else [])
+            return self.reply(200 if ok else 410, {'ok': ok})
         if path == '/api/hit':  # counts at most 60 visits an hour from one address
             counted = allow(('hit', self.ip()), 60, 3600)
             with lock:
@@ -217,7 +248,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         with lock: saved = db.execute('SELECT updated_at FROM saves WHERE account = ?', (row[0],)).fetchone()
         return self.reply(200, {'ok': True, 'token': self.new_session(row[0]), 'email': email, 'saveAt': saved and saved[0]})
 
-    def log_message(self, fmt, *args):  # keep the log to API calls and errors, not every sprite script
+    def log_message(self, fmt, *args):  # keep the log to API calls and errors, not every sprite script or lounge message
+        if self.path.startswith('/api/lounge/') and not (len(args) > 1 and str(args[1])[:1] == '5'): return
         if self.command in ('POST', 'PUT') or (len(args) > 1 and str(args[1])[:1] in '45'): super().log_message(fmt, *args)
 
 print(f'serving {WEB} on http://127.0.0.1:{PORT}  (data -> {DB})', flush=True)

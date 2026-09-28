@@ -112,15 +112,24 @@ Progress saves to the browser. An optional free account keeps a copy on the serv
   bass with a sub layer, and noise drums with body.
 - **A character customiser**: hair, hats, skin, clothes and bag colours, carried through every sprite and portrait.
 - **Social Zone**, entered through any Pokémon Center's Cable Club:
+  - a live lounge: everyone online walks around the same room, with name tags, chat bubbles and a list of who's in;
+  - real-time link battles and trades: talk to anyone to challenge them, or join the random-match queue;
   - a level-50 Battle Tower;
-  - link battles and trades through shareable links;
-  - a two-player versus mode.
+  - battles and trades with friends through shareable links, and a two-player versus mode on one screen.
 - **Who's That Pokémon?** A daily and endless silhouette quiz.
 - **Share cards**: every badge, capture, evolution and Hall of Fame entry can become a pixel-art card or a link.
 - **Classic glitches, recreated from how the original code works:**
   - [MissingNo.](#missingno) with its +128 item quantity and Hall of Fame corruption;
   - the [Mew trick](#the-mew-trick).
 - **Easter eggs**: the world has opinions about AI. Talk to everyone.
+
+### Link battles
+
+A live link battle runs in both players' browsers at once. Each game shows its own team at the bottom and sends only
+its picks (a move, a switch, a replacement) through the server. Both games roll from the same random seed, so they
+work out identical turns. Each turn the host also sends a checksum and a snapshot of the battle, and if the other game
+ever drifts it takes the host's numbers. `node tools/pvpfuzz.js` battles two copies of the game against each other
+to check they stay in step.
 
 ### MissingNo.
 
@@ -179,6 +188,7 @@ drivers are built on top of it:
 | --- | --- |
 | `node tools/talkfuzz.js` | Visits all 224 maps, talks to every NPC and reads every sign (1,000+ conversations), playing out any battles. |
 | `node tools/fuzzbattle.js` | Random battles with random species, levels and movesets; reports exceptions and stuck battles. |
+| `node tools/pvpfuzz.js` | Two copies of the game fight random link battles through their picks alone; every turn must match in both. |
 | `node -r ./tools/pathaudit.js tools/stepfuzz.js` | Fires every step/enter script on every walkable cell under random story states; flags anyone walking through a wall. |
 | `node tools/warpcheck.js` | Walks the warp graph and checks every exit leads back where it came from. |
 | `node tools/rendermap.js <Map> out.png` | Renders a whole map. `monsheet.js`, `vfxsheet.js` and `charsheet.js` do the same for Pokémon, move animations and characters. |
@@ -189,7 +199,8 @@ drivers are built on top of it:
 web host can serve. Set `CF_BEACON_TOKEN=<site token>` to include Cloudflare Web Analytics, which is cookieless.
 
 `tools/serve.py` adds the small site API: email sign-ups, accounts, cloud saves and the hit counter. It stores
-everything in one SQLite file under `data/`. Passwords are stored only as salted scrypt hashes, and session tokens only
+everything in one SQLite file under `data/`. It also runs the live Social Zone (`tools/lounge.py`): presence, chat,
+offers and the link battle relay, kept in memory and sent over WebSockets, with long polling as a fallback. Passwords are stored only as salted scrypt hashes, and session tokens only
 as SHA-256 hashes.
 
 Newsletter sign-ups are kept locally, then forwarded to the Levy Street list. If the page is hosted without the

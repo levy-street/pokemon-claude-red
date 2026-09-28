@@ -114,6 +114,16 @@
   #cloud-toast { position: fixed; z-index: 30; left: 50%; top: 54px; transform: translate(-50%, -8px); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
     padding: 8px 14px; border-radius: 18px; background: #17152c; border: 1px solid #2f2950; color: #5fd3b0; font: 600 13px/1 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
   #cloud-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* live SOCIAL ZONE chat (src/game/lounge.js) */
+  #lounge-chat { position: fixed; z-index: 25; display: flex; gap: 6px; margin: 0; padding: 6px; box-sizing: border-box; border-radius: 10px; background: rgba(12, 10, 28, .88); border: 1px solid #3a3360; }
+  #lounge-chat[hidden], #lounge-chat-btn[hidden] { display: none; }
+  #lounge-chat input { flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 10px; border-radius: 7px; border: 1px solid #3a3360; background: #0b0a14; color: #f3f0e9; font: 15px/1 ui-sans-serif, system-ui, -apple-system, sans-serif; outline: none; }
+  #lounge-chat input:focus { border-color: #e08a5f; }
+  #lounge-chat button { height: 34px; padding: 0 14px; border: 0; border-radius: 7px; background: #e08a5f; color: #1b1020; font: 700 13px/1 ui-sans-serif, system-ui, -apple-system, sans-serif; cursor: pointer; }
+  html.touch #lounge-chat input { font-size: 16px; height: 40px; }
+  html.touch #lounge-chat button { height: 40px; }
+  #lounge-chat-btn { position: fixed; z-index: 24; width: 38px; height: 38px; padding: 9px; border: 1px solid #3a3360; border-radius: 50%; background: rgba(12, 10, 28, .8); color: #f3f0e9; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #lounge-chat-btn svg { display: block; width: 100%; height: 100%; fill: currentColor; }
 </style>
 <meta name="subscribe-endpoint" content="api/subscribe">
 </head>
@@ -238,6 +248,7 @@
 <script src="src/scripts/extra.js"></script>
 <script src="src/game/share.js"></script>
 <script src="src/game/social.js"></script>
+<script src="src/game/lounge.js"></script>
 <script src="src/game/wtp.js"></script>
 <script src="src/game/savetransfer.js"></script>
 <script src="src/game/glitches.js"></script>
