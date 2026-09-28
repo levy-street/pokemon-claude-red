@@ -275,7 +275,9 @@
         if (path !== null) go(path + out, null, [ex, ey]);
         return;
       }
-      const actor = this.actorAt(tx, ty, p) || this.ghostAt(tx, ty) || (this.followerAt && this.followerAt(tx, ty));
+      // tapping your walking partner talks to it, except when it's standing in a doorway: then the tap means the door
+      // (after coming out of a building or an elevator it waits on the door tile, and a tap there must still take you in)
+      const actor = this.actorAt(tx, ty, p) || this.ghostAt(tx, ty) || (this.followerAt && m.warpAt(tx, ty) < 0 && this.followerAt(tx, ty));
       if (!actor && m.passable(tx, ty)) {
         const path = S.findPath(p, tx, ty);
         const edgeWarp = m.warpAt(tx, ty) >= 0 && (!m.isWarpTile(tx, ty) || ['down', 'up', 'left', 'right'].some(d => this.pushWarp(tx, ty, d)));
