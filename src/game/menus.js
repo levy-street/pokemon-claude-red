@@ -100,9 +100,10 @@
   G.optionsMenu = function* () {
     const O = G.state.options;
     for (;;) {
-      const items = ['TEXT SPEED: ' + ['SLOW', 'MID', 'FAST'][O.textSpeed - 1 < 0 ? 1 : O.textSpeed - 1], 'BATTLE ANIM: ' + (O.battleAnim ? 'ON' : 'OFF'), 'BATTLE STYLE: ' + (O.battleStyle === 'shift' ? 'SHIFT' : 'SET'), 'SOUND: ' + (O.mute ? 'OFF' : 'ON'), 'DAY/NIGHT: ' + (O.dayNight === false ? 'OFF' : 'ON'), 'CANCEL'];
+      const items = ['TEXT SPEED: ' + ['SLOW', 'MID', 'FAST'][O.textSpeed - 1 < 0 ? 1 : O.textSpeed - 1], 'BATTLE ANIM: ' + (O.battleAnim ? 'ON' : 'OFF'), 'BATTLE STYLE: ' + (O.battleStyle === 'shift' ? 'SHIFT' : 'SET'), 'SOUND: ' + (O.mute ? 'OFF' : 'ON'), 'DAY/NIGHT: ' + (O.dayNight === false ? 'OFF' : 'ON'), 'FOLLOWER: ' + (O.follower === false ? 'OFF' : 'ON'), 'CANCEL'];
       const r = yield* G.choose(items, { x: 120, y: 30, w: 190 });
-      if (r < 0 || r === 5) return;
+      if (r < 0 || r === 6) return;
+      if (r === 5) O.follower = O.follower === false; // the lead POKéMON walking behind you (src/game/follower.js)
       if (r === 4) O.dayNight = O.dayNight === false;
       if (r === 0) { O.textSpeed = O.textSpeed % 3 + 1; G.textSpeed = O.textSpeed; }
       if (r === 1) O.battleAnim = !O.battleAnim;

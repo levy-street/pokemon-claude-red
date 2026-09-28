@@ -58,7 +58,7 @@
       const v = G.DIRS[steps[i]]; if (!v) return steps;
       const nx = x + v[0], ny = y + v[1];
       if (m.inside(nx, ny) && i < steps.length - 1) {
-        const other = ow.actors.concat([ow.player]).find(o => o !== a && !o.hidden && o.x === nx && o.y === ny);
+        const other = ow.actors.concat([ow.player]).find(o => o !== a && !o.hidden && !o.follower && !o.ghost && o.x === nx && o.y === ny); // the walking partner and other players never block a cutscene
         if (other || !(m.passable(nx, ny) || m.warpAt(nx, ny) >= 0) || ow.pairBlocked(x, y, nx, ny)) ok = false;
       }
       x = nx; y = ny;
@@ -118,7 +118,7 @@
     if (a.x === tx && a.y === ty) return '';
     const skip = new Set([a].concat(opts.ignore || []));
     const occ = new Set();
-    for (const o of ow.actors.concat([ow.player])) if (!skip.has(o) && !o.hidden) occ.add(o.x + ',' + o.y);
+    for (const o of ow.actors.concat([ow.player])) if (!skip.has(o) && !o.hidden && !o.follower && !o.ghost) occ.add(o.x + ',' + o.y);
     const goal = (x, y) => x === tx && y === ty;
     const walk = (x, y) => m.inside(x, y) && !occ.has(x + ',' + y) &&
       (m.passable(x, y) || (goal(x, y) && (opts.blockedGoal || m.warpAt(x, y) >= 0)));
