@@ -51,7 +51,7 @@ def connect():
         bid TEXT, sid TEXT,       -- random browser id, random page-load id
         pid TEXT,                 -- random id of the save (it travels with cloud saves and transfers)
         kind TEXT NOT NULL,       -- open, new_game, continue, moment, area, blackout, save, ping, share, ... (KINDS)
-        map TEXT, badges INTEGER, dex INTEGER, playtime INTEGER,  -- where the player was: map, badges, Pokémon caught, minutes played
+        map TEXT, badges INTEGER, dex INTEGER, playtime INTEGER,  -- where the player was: map, badges, Pokémon caught, seconds played
         data TEXT,                -- the event's details, JSON
         country TEXT);            -- from Cloudflare's CF-IPCountry
       CREATE INDEX IF NOT EXISTS events_pid ON events (pid);
@@ -153,7 +153,7 @@ def stats(db, days):
     for e in moments:
         if e[9].get('kind') == 'leader' and e[8] is not None: mins[e[9].get('badge')].append(e[8])
     for badge, v in sorted(mins.items(), key=lambda kv: statistics.median(kv[1])):
-        print(f'  {badge:14} {len(v):4} players, median {statistics.median(v) / 60:.1f} h of play')
+        print(f'  {badge:14} {len(v):4} players, median {statistics.median(v) / 3600:.1f} h of play')
     print('Caught:   ', top(C(e[9].get('sp') for e in moments if e[9].get('kind') == 'caught'), 15))
     print('Evolved:  ', top(C(e[9].get('sp') for e in moments if e[9].get('kind') == 'evolved'), 10))
     hof = [e for e in moments if e[9].get('kind') == 'hof']
@@ -175,7 +175,7 @@ def stats(db, days):
     head('Leaderboard')
     board = sorted(players.values(), key=lambda p: (p['stage'], p['badges'], p['dex'], p['pt']), reverse=True)[:15]
     for i, p in enumerate(board, 1):
-        print(f"  {i:2}. {str(p['name'] or '?'):10} {STAGES[p['stage']][0]:24} badges {p['badges']}  caught {p['dex']:3}  best Lv {p['lead']:3}  {p['pt'] / 60:5.1f} h  last at {p['map']} {p['last'][:16]}")
+        print(f"  {i:2}. {str(p['name'] or '?'):10} {STAGES[p['stage']][0]:24} badges {p['badges']}  caught {p['dex']:3}  best Lv {p['lead']:3}  {p['pt'] / 60:6.0f} min  last at {p['map']} {p['last'][:16]}")
 
 if len(sys.argv) > 1 and sys.argv[1] == 'stats':
     stats(connect(), float(sys.argv[2]) if len(sys.argv) > 2 else 36500); sys.exit()
