@@ -472,7 +472,7 @@
   function* receive(m) {
     G.dexCaught && G.dexCaught(m.species);
     if (G.state.party.length < 6) G.state.party.push(m);
-    else { const box = G.state.boxes[G.state.box] || (G.state.boxes[G.state.box] = []); box.push(m); yield* say(m.name + ' was sent to the PC!'); }
+    else { const box = G.currentBox(); box.push(m); yield* say(m.name + ' was sent to the PC!'); }
     const to = m.evoByTrade && m.evoByTrade();
     if (to) yield* G.evolve(m, to);
   }
@@ -543,7 +543,7 @@
         const out = s.outgoing[k], m = G.Mon.from(out.mon);
         const a = yield* G.choose(['COPY LINK AGAIN', 'TAKE BACK', 'CANCEL'], { x: 170, y: 60, w: 144 });
         if (a === 0) yield* copyLink(tradeLink('trade', out.id, m), 'trade offer');
-        else if (a === 1) { s.outgoing.splice(k, 1); if (G.state.party.length < 6) G.state.party.push(m); else (G.state.boxes[G.state.box] = G.state.boxes[G.state.box] || []).push(m); yield* say(m.name + ' came back to you!'); }
+        else if (a === 1) { s.outgoing.splice(k, 1); if (G.state.party.length < 6) G.state.party.push(m); else G.currentBox().push(m); yield* say(m.name + ' came back to you!'); }
       } else { yield* say('Happy trading!'); return; }
     }
   }

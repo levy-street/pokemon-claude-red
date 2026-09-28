@@ -105,7 +105,7 @@
     const S = G.state, isNew = S && !S.dex.caught[sp];
     origCaught(sp);
     if (!isNew || evolving) return;
-    const d = G.DATA.species[sp] || {}, mon = S.party.concat(...S.boxes).filter(m => m.species === sp).pop();
+    const d = G.DATA.species[sp] || {}, mon = S.party.concat(...S.boxes.filter(Array.isArray)).filter(m => m && m.species === sp).pop();
     const inBattle = G.engine.scenes.some(s => s.constructor && s.constructor.name === 'BattleScene');
     const data = { sp, lv: mon ? mon.level : 5, dex: d.dex || 0, place: place() };
     const first = Object.keys(S.dex.caught).length === 1 && !(S.achievements || []).some(a => a.kind === 'starter');

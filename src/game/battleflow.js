@@ -25,7 +25,7 @@
     if (ui && ui.askYesNo) nick = yield* ui.askYesNo(q); else nick = yield* G.ask(q);
     if (nick) { const n = yield* G.nameEntry(m.sp.name + "'s nickname?", m.sp.name, 10); if (n && n !== m.sp.name) m.nick = n; }
     if (G.state.party.length < 6) { G.state.party.push(m); return 'party'; }
-    const box = G.state.boxes[G.state.box] || (G.state.boxes[G.state.box] = []);
+    const box = G.currentBox();
     if (box.length >= 20) { yield* say('The POKéMON BOX is full! It can\'t accept any more POKéMON!'); return 'full'; }
     box.push(m);
     yield* say(m.name + ' was transferred to ' + (G.flag('EVENT_MET_BILL') ? "BILL's PC" : "someone's PC") + '!');

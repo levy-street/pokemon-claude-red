@@ -18,7 +18,7 @@
     const lvOk = m => G.DATA.species[m.species].glitch ? m.level >= 0 && m.level <= 255 : m.level >= 1 && m.level <= 100; // MISSINGNO. can be Lv0 or Lv132
     const monOk = m => m && G.DATA.species[m.species] && lvOk(m) && Array.isArray(m.moves) && m.moves.length >= 1 && m.moves.length <= 4 && m.moves.every(x => x && G.DATA.moves[x.id]);
     if (!Array.isArray(s.party) || s.party.length > 6 || !s.party.every(monOk)) return false;
-    if (s.boxes && (!Array.isArray(s.boxes) || !s.boxes.every(b => Array.isArray(b) && b.every(monOk)))) return false;
+    if (s.boxes && (!Array.isArray(s.boxes) || !s.boxes.every(b => b === null || (Array.isArray(b) && b.every(monOk))))) return false; // null: an empty box gap, repaired on load
     if (s.badges && (!Array.isArray(s.badges) || !s.badges.every(b => G.BADGES.includes(b)))) return false;
     return true;
   }

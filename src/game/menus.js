@@ -7,8 +7,18 @@
 
   // ---------------- save / load ----------------
   const SAVE_KEY = 'pkmn_pixel_red_save';
+  // the PC's boxes as a list with no gaps: CHANGE BOX used to jump straight to, say, BOX 5, leaving empty slots that
+  // crashed every new POKéMON registration and saved as nulls the game couldn't load back (repaired here on load too)
+  G.fixBoxes = function (S) {
+    S.box = Math.max(0, Math.min(11, S.box | 0));
+    const old = Array.isArray(S.boxes) ? S.boxes : [];
+    S.boxes = Array.from({ length: Math.max(old.length, S.box + 1) }, (_, i) => Array.isArray(old[i]) ? old[i].filter(Boolean) : []);
+    S.party = (S.party || []).filter(Boolean);
+    return S;
+  };
+  G.currentBox = () => G.fixBoxes(G.state).boxes[G.state.box];
   G.saveGame = function () {
-    const S = G.state;
+    const S = G.fixBoxes(G.state);
     const data = Object.assign({}, S, { party: S.party.map(m => m.toJSON()), boxes: S.boxes.map(b => b.map(m => m.toJSON())), savedAt: Date.now() });
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); return true; } catch (e) { return false; }
   };
@@ -16,8 +26,8 @@
     try {
       const raw = localStorage.getItem(SAVE_KEY); if (!raw) return null;
       const d = JSON.parse(raw);
-      d.party = d.party.map(G.Mon.from); d.boxes = d.boxes.map(b => b.map(G.Mon.from));
-      return Object.assign(G.newState(), d);
+      d.party = (d.party || []).filter(Boolean).map(G.Mon.from); d.boxes = (d.boxes || [[]]).map(b => (b || []).filter(Boolean).map(G.Mon.from));
+      return G.fixBoxes(Object.assign(G.newState(), d));
     } catch (e) { return null; }
   };
   G.hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };

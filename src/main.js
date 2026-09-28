@@ -4,7 +4,7 @@
   function param(k) { const m = String((window.location && window.location.search) || '').match(new RegExp('[?&]' + k + '=([^&]+)')); return m ? decodeURIComponent(m[1]) : null; }
   G.param = param;
   G.startGame = function (st) {
-    G.state = st || G.newState();
+    G.state = G.fixBoxes(st || G.newState());
     if (G.applyLook) G.applyLook(G.state.look); // every new or loaded game wears its own look
     const ow = G.ow = new G.Overworld();
     G.engine.push(ow);

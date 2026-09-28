@@ -66,7 +66,7 @@
     yield* G.say('Accessed ' + (G.flag('EVENT_MET_BILL') ? "BILL's" : "someone's") + ' PC.\fAccessed POKéMON Storage System.');
     const S = G.state;
     for (;;) {
-      const box = S.boxes[S.box] || (S.boxes[S.box] = []);
+      const box = G.currentBox();
       const r = yield* G.choose(['WITHDRAW PKMN', 'DEPOSIT PKMN', 'RELEASE PKMN', 'CHANGE BOX', 'SEE YA!'], { x: 150, y: 20, w: 164 });
       if (r < 0 || r === 4) return;
       if (r === 0) {

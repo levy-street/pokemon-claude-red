@@ -89,6 +89,9 @@
   }
   G.defMapScript('OaksLab', {
     enter() {
+      // a starter pick that crashed part-way (the old empty-box bug) hid its ball without handing the POKéMON over:
+      // put the balls back so the player can choose again instead of being stuck in the lab
+      if (S.flag('EVENT_OAK_ASKED_TO_CHOOSE_MON') && !S.flag('EVENT_GOT_STARTER') && !G.state.party.length) for (const id in STARTERS) S.show(id);
       if (S.flag('EVENT_OAK_WALKING_INTO_LAB')) {
         return (function* () {
           S.clear('EVENT_OAK_WALKING_INTO_LAB');
