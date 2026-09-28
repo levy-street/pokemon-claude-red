@@ -476,9 +476,7 @@
       for (let i = this.fx.length - 1; i >= 0; i--) { const f = this.fx[i]; if (!f.under) continue; if (f.draw(s, cx, cy, this.t) === false) this.fx.splice(i, 1); }
       // actors
       const list = this.actors.filter(a => !a.hidden).concat(this.player.hidden ? [] : [this.player]);
-      // the walking partner sorts just behind the player, so a big one (ONIX, GYARADOS) never hides you walking north
-      const key = a => a.follower ? Math.min(a.py, this.player.py - 0.5) : a.py;
-      list.sort((a, b) => (key(a) - key(b)) || (a.isPlayer ? 1 : -1));
+      list.sort((a, b) => (a.py - b.py) || (a.isPlayer ? 1 : -1)); // nearer the bottom of the screen = in front, the walking partner included
       for (const a of list) this.drawActor(s, a, cx, cy);
       // upper layers
       s.blit(R.up, -(cx + mx), -(cy + my));

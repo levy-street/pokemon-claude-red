@@ -4,7 +4,8 @@
 //
 // It steps into whatever tile the player just left, so it only ever stands where the player could, hops ledges
 // behind them, and comes back out after doors. It never blocks anything: the player, NPCs, trainers' line of sight or
-// boulders all ignore it. It goes back in its ball while surfing or cycling, or if the lead has fainted; OPTION >
+// boulders all ignore it. It's drawn by depth like everyone else: in front of you when it's nearer the camera
+// (walking north), behind you when it's further away (walking south). It goes back in its ball while surfing or cycling, or if the lead has fainted; OPTION >
 // FOLLOWER turns it off. Talk to it (turn round and press A) to see how it's doing.
 (function (G) {
   'use strict';
