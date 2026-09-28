@@ -752,9 +752,12 @@
   });
 
   // ---------------- Vermilion Gym: trash-can switch puzzle ----------------
-  const GYM_TRASH_CANS = [ // [mask, candidates...] (engine/events/hidden_events/vermilion_gym_trash.asm)
-    [2, 1, 3, 0, 0], [3, 0, 2, 4, 0], [2, 1, 5, 0, 0], [3, 0, 4, 6, 0], [4, 1, 3, 5, 7], [3, 2, 4, 8, 0], [3, 3, 7, 9, 0], [4, 4, 6, 8, 10],
-    [3, 5, 7, 11, 0], [3, 6, 10, 12, 0], [4, 7, 9, 11, 13], [3, 8, 10, 14, 0], [2, 9, 13, 0, 0], [3, 10, 12, 14, 0], [2, 11, 13, 0, 0]];
+  // the 15 cans are numbered down each column (5 columns of 3). The second switch is always in a can next to the
+  // first one, as the puzzle was designed. Red/Blue had a bug (engine/events/hidden_events/vermilion_gym_trash.asm:
+  // a random AND mask that can come out 0) that put it in the top-left can instead about 40% of the time, which is
+  // what made the puzzle feel impossible; we don't reproduce that one
+  const trashNeighbours = i => { const c = Math.floor(i / 3), r = i % 3, out = [];
+    if (r > 0) out.push(i - 1); if (r < 2) out.push(i + 1); if (c > 0) out.push(i - 3); if (c < 4) out.push(i + 3); return out; };
   const GYM_DOOR = [[4, 4], [5, 4], [4, 5], [5, 5]];
   function vermilionGymDoor(open) {
     const m = G.ow.map;
@@ -774,8 +777,8 @@
       if (!S.flag('EVENT_1ST_LOCK_OPENED')) {
         if (idx !== st.first) { yield* S.say('VermilionGymTrashText'); return; }
         S.set('EVENT_1ST_LOCK_OPENED');
-        const e = GYM_TRASH_CANS[idx], off = (rnd(256) & e[0]) - 1;
-        st.second = off < 0 ? 0 : (e[1 + off] & 0xf); // off < 0 reproduces the original bug (reads a padding zero)
+        const near = trashNeighbours(idx);
+        st.second = near[rnd(near.length)];
         yield* S.say('VermilionGymTrashSuccessText1');
         sfx('select');
         return;

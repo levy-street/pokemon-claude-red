@@ -116,7 +116,6 @@
         const i = yield* G.choose(S.bag.map(e => G.itemName(e.id) + ' ×' + e.n), { x: 110, y: 4, w: 204 });
         if (i < 0) continue;
         const e = S.bag[i];
-        if (G.bag.isKey(e.id)) { yield* G.say("That's too important to store."); continue; }
         const q = yield* quantity(e.n); if (!q) continue;
         const pe = S.pc.find(x => x.id === e.id); if (pe) pe.n += q; else S.pc.push({ id: e.id, n: q });
         G.bag.remove(e.id, q);
@@ -125,6 +124,7 @@
         if (!S.pc.length) { yield* G.say('There is nothing stored.'); continue; }
         const i = yield* G.choose(S.pc.map(e => G.itemName(e.id) + ' ×' + e.n), { x: 110, y: 4, w: 204 });
         if (i < 0) continue;
+        if (G.bag.isKey(S.pc[i].id)) { yield* G.say("That's too important to toss!"); continue; }
         if (yield* G.ask('Is it OK to toss ' + G.itemName(S.pc[i].id) + '?')) S.pc.splice(i, 1);
       }
     }

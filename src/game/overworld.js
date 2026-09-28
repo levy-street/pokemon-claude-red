@@ -84,6 +84,7 @@
       if (this.prevMapName !== name) { const pm = this.prevMapName && G.maps.cache[this.prevMapName]; if (pm && pm.overrides && (Object.keys(pm.overrides).length || (pm.passOverride && Object.keys(pm.passOverride).length))) { pm.overrides = {}; pm.passOverride = {}; delete MR.cache[pm.name]; } this.strength = false; this.flashed = false; }
       this.prevMapName = name;
       this.autoPath = null;
+      this.arrived = null; // set by doWarp: the way we came through a door or stairs, until the first step
       if (!this.player) this.player = new Actor({ sprite: 'red', isPlayer: true });
       Object.assign(this.player, { x, y, dir: dir || S.dir, moving: false, prog: 0, jump: 0 });
       this.spawnActors();
@@ -228,8 +229,11 @@
         } else { d = { U: 'up', D: 'down', L: 'left', R: 'right' }[this.autoPath[this.autoIdx]]; auto = true; }
       }
       if (d) {
-        // standing on a warp cell and pushing toward its exit (map edge, doormat, gate side door)
-        if (this.pushWarp(p.x, p.y, d)) { p.dir = d; this.doWarp(this.map.warpAt(p.x, p.y)); return; }
+        // standing on a warp cell and pushing toward its exit (map edge, doormat, gate side door). Right after
+        // arriving, carrying on the way you came never bounces you back (off the S.S. Anne gangway, the ROCKET
+        // HIDEOUT stairs, out of its elevator), and other ways only count when blocked (a doormat, a map edge)
+        const bounce = this.arrived && (d === this.arrived || this.canMove(p, d).ok);
+        if (!bounce && this.pushWarp(p.x, p.y, d)) { p.dir = d; this.doWarp(this.map.warpAt(p.x, p.y)); return; }
         if (p.dir !== d && !this.wasMoving && !auto) { p.dir = d; this.turnDelay = 6; return; }
         if (this.turnDelay > 0) { this.turnDelay--; if (this.turnDelay > 0) return; }
         if (G.tryPushBoulder && G.tryPushBoulder(this, d)) { this.wasMoving = false; return; }
@@ -314,6 +318,7 @@
     }
     onPlayerStep() {
       const p = this.player, S = G.state;
+      this.arrived = false;
       S.steps++;
       if (G.stepHooks) for (const f of G.stepHooks) f(S);
       if (this.pendingConn) {
@@ -403,6 +408,7 @@
         yield* G.fadeOut(10);
         ow.player.hidden = false;
         ow.load(to, dw.x, dw.y, ow.player.dir);
+        ow.arrived = ow.player.dir;
         ow.snapCamera();
         yield* G.fadeIn(10);
         if (dm.outdoor) ow.showBanner();

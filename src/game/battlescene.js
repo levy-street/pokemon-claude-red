@@ -358,6 +358,7 @@
           moves.forEach((mv, i) => {
             const cx = 20 + (i % 2) * 100, cy = 144 + Math.floor(i / 2) * 15;
             G.ui.text(s, G.moveName(mv.id), cx, cy);
+            if (i === menu.swap && i !== menu.sel) F.draw(s, '▶', cx - 10, cy, hex('#9890b8')); // the move picked to swap
             if (i === menu.sel) G.ui.cursor(s, cx - 10, cy, self.t);
           });
           const mv = moves[menu.sel], md = G.DATA.moves[mv.id];
@@ -382,8 +383,21 @@
         if (I.pressed.right && menu.sel % 2 === 0 && menu.sel + 1 < n) menu.sel++;
         if (I.pressed.up && menu.sel >= 2) menu.sel -= 2;
         if (I.pressed.down && menu.sel + 2 < n) menu.sel += 2;
+        // SELECT: pick a move, then SELECT another to swap their places (not in link battles, where both games keep
+        // the same move order)
+        if (I.pressed.select && n > 1 && !b.o.pvp) {
+          if (menu.swap === undefined || menu.swap === null) menu.swap = menu.sel;
+          else {
+            const a = menu.swap, c = menu.sel; menu.swap = null;
+            if (a !== c) {
+              [moves[a], moves[c]] = [moves[c], moves[a]];
+              const mim = b.p.v.mimic; if (mim) mim.slot = mim.slot === a ? c : mim.slot === c ? a : mim.slot;
+            }
+          }
+          if (G.sfx) G.sfx('select');
+        }
         if (I.pressed.a) { this.menu = null; this.lastMove = menu.sel; if (G.sfx) G.sfx('select'); return menu.sel; }
-        if (I.pressed.b) { this.menu = null; return -1; }
+        if (I.pressed.b) { if (menu.swap !== undefined && menu.swap !== null) { menu.swap = null; continue; } this.menu = null; return -1; }
       }
     }
     *chooseMove(ids, prompt) {

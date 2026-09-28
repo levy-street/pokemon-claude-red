@@ -80,6 +80,10 @@
     }
   }
   G.evolve = function* (m, to, noCancel) {
+    try { return yield* evolve(m, to, noCancel); }
+    finally { if (G.music && G.mapMusic && G.ow && G.ow.map) G.music(G.mapMusic(G.ow.map)); } // the evolution theme stops with the scene
+  };
+  function* evolve(m, to, noCancel) {
     const sc = new EvoScene(m, to);
     G.engine.push(sc);
     const say = function* (t) { sc.box = G.fmt(t); yield; while (!G.input.pressed.a && !G.input.pressed.b) yield; sc.box = null; };
@@ -113,7 +117,7 @@
     for (const mv of m.movesAtLevel(m.level)) yield* G.learnMoveFlow(m, mv, { msg: say, askYesNo: q => G.ask(q) });
     G.engine.pop(sc);
     return true;
-  };
+  }
 
   // ---------------- transitions ----------------
   function* transition(kind) {
