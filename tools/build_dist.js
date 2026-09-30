@@ -34,9 +34,10 @@ html = html.replace(/<script src="(src\/[^"?]+\.js)"><\/script>/g, (m, f) => {
   return `<script src="${f}?v=${h}"></script>`;
 });
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
-if (site) { // for search engines: crawl the game, skip the API, and here's the one page there is
+if (site) { // for search engines: crawl the game, skip the API; the sitemap lists the reference pages built below
   fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${site}sitemap.xml\n`);
-  fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${site}</loc><lastmod>${new Date().toISOString().slice(0, 10)}</lastmod></url>\n</urlset>\n`);
+  // the Pokédex, moves, locations, guides, favicons, manifest, llms.txt and sitemap (tools/build_site.js)
+  console.log('site pages:', require('./build_site.js')(OUT, site, H));
 }
 fs.cpSync(path.join(ROOT, 'src'), path.join(OUT, 'src'), { recursive: true });
 // link preview: the title screen after its intro settles

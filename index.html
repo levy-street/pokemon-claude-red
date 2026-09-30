@@ -3,16 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pokemon - Claude Red</title>
-<meta name="description" content="A fan remake of Pokémon Red where every visual is drawn from raw pixels in code. Plays in the browser with keyboard, mouse, touch or gamepad.">
+<title>Pokémon Claude Red: Play Pokémon Red Free in Your Browser</title>
+<meta name="description" content="Play Pokémon Red free in your browser, remade from raw pixels by Claude AI: all 151 Pokémon, the full Kanto story, online battles and trades. No download.">
 <meta name="theme-color" content="#0d0c16">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Pokemon - Claude Red">
-<meta property="og:description" content="Pokémon Red remade from raw pixels in code: the full Kanto story, redrawn art, a social zone with Battle Tower, link battles and trades. Free fan demo, runs in the browser.">
+<meta property="og:site_name" content="Pokémon Claude Red">
+<meta property="og:url" content="https://claudered.dev/">
+<meta property="og:title" content="Pokémon Claude Red: Play Pokémon Red Free in Your Browser">
+<meta property="og:description" content="Pokémon Red remade from raw pixels by Claude: the full Kanto story, all 151 Pokémon, online link battles and trades. Free, no download, works on phones.">
 <meta property="og:image" content="preview.png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="720">
+<meta property="og:image:alt" content="Pokémon Claude Red title screen, drawn in pixel art by code">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pokémon Claude Red: Play Pokémon Red Free in Your Browser">
+<meta name="twitter:description" content="Pokémon Red remade from raw pixels by Claude: all 151 Pokémon, the full Kanto story, online battles and trades. Free in your browser.">
+<script type="application/ld+json">[
+{"@context":"https://schema.org","@type":"VideoGame","name":"Pokémon Claude Red","alternateName":["Claude Red","Pokemon Claude Red"],"url":"https://claudered.dev/","image":"https://claudered.dev/preview.png",
+ "description":"A free, non-commercial fan remake of Pokémon Red that runs in any web browser. Claude, an AI model by Anthropic, rebuilt the game from raw pixels in JavaScript: all 151 Pokémon, the full Kanto story, the classic glitches, and online link battles and trades.",
+ "genre":["Role-playing game","Adventure"],"gamePlatform":["Web browser","PC","iOS","Android"],"applicationCategory":"Game","operatingSystem":"Any","playMode":["SinglePlayer","MultiPlayer"],"inLanguage":"en",
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"USD","availability":"https://schema.org/InStock"},
+ "author":{"@type":"Organization","name":"Levy Street","url":"https://levystreet.com"},"publisher":{"@type":"Organization","name":"Levy Street","url":"https://levystreet.com"},
+ "sameAs":["https://github.com/levy-street/pokemon-claude-red","https://www.youtube.com/watch?v=7G3PPKV0iHA"]},
+{"@context":"https://schema.org","@type":"WebSite","name":"Pokémon Claude Red","alternateName":"Claude Red","url":"https://claudered.dev/"},
+{"@context":"https://schema.org","@type":"Organization","name":"Levy Street","url":"https://levystreet.com","email":"hello@levystreet.com","logo":"https://claudered.dev/icon-512.png"}
+]</script>
 <style>
   html, body { margin: 0; height: 100%; background: #0d0c16; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
@@ -114,6 +133,10 @@
   #cloud-toast { position: fixed; z-index: 30; left: 50%; top: 54px; transform: translate(-50%, -8px); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
     padding: 8px 14px; border-radius: 18px; background: #17152c; border: 1px solid #2f2950; color: #5fd3b0; font: 600 13px/1 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
   #cloud-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* what the canvas shows, in words: for screen readers and search engines (the game itself is pixels) */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  noscript p { position: fixed; inset: 40% 16px auto; text-align: center; color: #ece8f6; font: 16px/1.5 system-ui, sans-serif; }
+  noscript a { color: #e08a5f; }
   /* live SOCIAL ZONE chat (src/game/lounge.js) */
   #lounge-chat { position: fixed; z-index: 25; display: flex; gap: 6px; margin: 0; padding: 6px; box-sizing: border-box; border-radius: 10px; background: rgba(12, 10, 28, .88); border: 1px solid #3a3360; }
   #lounge-chat[hidden], #lounge-chat-btn[hidden] { display: none; }
@@ -143,11 +166,18 @@
     <small class="ls-fine">Occasional emails from Levy St. on AI &times; gaming &times; consumer. Unsubscribe anytime.</small>
   </div>
   <nav class="ls-links">
+    <a href="guides/" title="Pokémon Red guides, Pokédex and maps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM9 4h2v5l-1-.75L9 9V4zm9 16H6V4h1v9l3-2.25L13 13V4h5v16z"/></svg><span>Guides</span></a>
     <a href="mailto:hello@levystreet.com?subject=Pok%C3%A9mon%20Claude%20Red" title="Contact: hello@levystreet.com"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4.24-8 5-8-5V6l8 5 8-5v2.24z"/></svg><span>hello@levystreet.com</span></a>
     <a href="https://github.com/levy-street/pokemon-claude-red" target="_blank" rel="noopener" title="Source on GitHub" aria-label="Source on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
   </nav>
 </header>
-<canvas id="screen"></canvas>
+<main class="sr-only">
+  <h1>Pokémon Claude Red: play Pokémon Red free in your browser</h1>
+  <p>Pokémon Claude Red is a free, non-commercial fan remake of Pokémon Red that runs in any web browser on a computer, tablet or phone, with no download, emulator or ROM. Claude, an AI model by Anthropic, rebuilt the whole game from raw pixels in JavaScript: all 151 Pokémon, the Kanto story from Pallet Town to the Elite Four, the classic glitches like MissingNo. and the Mew trick, and a Social Zone for online link battles and trades.</p>
+  <nav aria-label="Guides"><a href="guides/play-pokemon-red-online/">How to play Pokémon Red online</a> · <a href="pokedex/">Pokédex</a> · <a href="locations/">Locations</a> · <a href="gym-leaders/">Gym leaders</a> · <a href="guides/walkthrough/">Walkthrough</a> · <a href="guides/">All guides</a> · <a href="faq/">About &amp; FAQ</a></nav>
+</main>
+<noscript><p>Pokémon Claude Red needs JavaScript to run. Meanwhile, browse the <a href="guides/">Pokémon Red guides</a> and <a href="pokedex/">Pokédex</a>.</p></noscript>
+<canvas id="screen" role="img" aria-label="Pokémon Claude Red, the game"></canvas>
 <div id="pad" data-chrome hidden>
   <div id="pad-body"></div>
   <div class="dpad" id="dpad" role="group" aria-label="D-pad">
