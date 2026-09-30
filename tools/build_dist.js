@@ -1,6 +1,6 @@
 // Bundle the playable game into dist/ for static hosting (Cloudflare Pages, GitHub Pages, any web server):
 // index.html + src/ only, plus preview.png (the title screen at 4x) for link previews on Reddit/Discord/etc.
-// usage: [CF_BEACON_TOKEN=<token>] [GOOGLE_SITE_VERIFICATION=<token>] node tools/build_dist.js [https://your.site/]
+// usage: [CF_BEACON_TOKEN=<token>] [GOOGLE_SITE_VERIFICATION=<token>] [INDEXNOW_KEY=<key>] node tools/build_dist.js [https://your.site/]
 // The URL makes og:image absolute (some scrapers need it) and adds a canonical link, robots.txt and sitemap.xml.
 // GOOGLE_SITE_VERIFICATION is the content of Search Console's HTML-tag verification (<meta name="google-site-verification">).
 'use strict';
@@ -25,6 +25,9 @@ if (gsv) {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(gsv)) { console.error('GOOGLE_SITE_VERIFICATION should be the content="..." value of the Search Console meta tag'); process.exit(1); }
   html = html.replace('</head>', `<meta name="google-site-verification" content="${gsv}">\n</head>`);
 }
+// IndexNow (Bing, Yandex, Seznam, Naver...): the key file proves the submissions from tools/indexnow.js are ours
+const inKey = process.env.INDEXNOW_KEY;
+if (inKey && !/^[A-Za-z0-9-]{8,128}$/.test(inKey)) { console.error('INDEXNOW_KEY should be 8-128 letters, digits or dashes'); process.exit(1); }
 // one canonical address for search engines, however the page was linked (?ref=reddit, ?team=..., trailing slashes)
 if (site) html = html.replace('</head>', `<link rel="canonical" href="${site}">\n</head>`);
 // every script link carries a hash of its contents, so caches (Cloudflare keeps .js for hours) can never serve an
@@ -34,6 +37,7 @@ html = html.replace(/<script src="(src\/[^"?]+\.js)"><\/script>/g, (m, f) => {
   return `<script src="${f}?v=${h}"></script>`;
 });
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
+if (inKey) fs.writeFileSync(path.join(OUT, inKey + '.txt'), inKey);
 if (site) { // for search engines: crawl the game, skip the API; the sitemap lists the reference pages built below
   fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${site}sitemap.xml\n`);
   // the Pokédex, moves, locations, guides, favicons, manifest, llms.txt and sitemap (tools/build_site.js)

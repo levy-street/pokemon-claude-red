@@ -3,7 +3,12 @@
 // rendered by the game's own code. Also the favicon set (a pixel POKé BALL), the web manifest, llms.txt and the sitemap.
 // Called by tools/build_dist.js:  require('./build_site.js')(OUT, site, H)
 'use strict';
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), crypto = require('crypto');
+// local build state (git-ignored data/): each page's content hash and the date it last really changed, and the pages
+// changed since the last successful IndexNow submission (tools/indexnow.js sends and clears them after a deploy)
+const STATE = path.join(__dirname, '..', 'data'), MANIFEST = path.join(STATE, 'seo-manifest.json'), PENDING = path.join(STATE, 'seo-pending.json');
+const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return d; } };
+const LASTMOD = '%%LASTMOD%%';
 
 module.exports = function buildSite(OUT, site, H) {
   const SITE = (site || 'https://claudered.dev/').replace(/\/?$/, '/');
@@ -11,7 +16,11 @@ module.exports = function buildSite(OUT, site, H) {
   const D = G.DATA, M = G.MAPDATA.maps, { Surface, hex } = G.gfx;
   const TODAY = new Date().toISOString().slice(0, 10);
   const pages = []; // [path, priority]
-  const write = (p, html, priority) => { const f = path.join(OUT, p, 'index.html'); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, html); pages.push([p, priority || 0.6]); };
+  const prev = readJSON(MANIFEST, {}), next = {}, changed = [];
+  // a page's date is the day its content last changed (hashed with the date left out), not the day of the build
+  const stamp = (p, html) => { const h = crypto.createHash('sha1').update(html).digest('hex'), same = prev[p] && prev[p].hash === h;
+    next[p] = { hash: h, lastmod: same ? prev[p].lastmod : TODAY }; if (!same) changed.push(p); return next[p].lastmod; };
+  const write = (p, html, priority) => { const f = path.join(OUT, p, 'index.html'); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, html.split(LASTMOD).join(stamp(p, html))); pages.push([p, priority || 0.6]); };
   const strip = s => String(s).replace(/<[^>]+>/g, '');
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const list = (a, and) => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + (a.length > 2 ? ',' : '') + ' ' + (and || 'and') + ' ' + a[a.length - 1];
@@ -236,7 +245,7 @@ ${faq && faq.length ? `<section class="faq"><h2>Frequently asked questions</h2>$
 <aside class="cta"><div><strong>Play Pokémon Red in your browser, free.</strong> Pokémon Claude Red is a fan remake of Pokémon Red where every pixel is drawn by code: all 151 POKéMON, the full Kanto story, link battles and trades online. No download, no emulator, works on your phone.</div><a class="play big" href="/?ref=site-cta">▶ Play now</a></aside>
 </main>
 <footer><p><a href="/faq/">About &amp; FAQ</a> · <a href="/guides/">Guides</a> · <a href="https://github.com/levy-street/pokemon-claude-red">Source code</a> · <a href="https://levystreet.com/?utm_source=claudered">Levy St.</a></p>
-<p class="fine">A free, non-commercial fan project. Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc. Game data from the pret/pokered disassembly. Not affiliated with Nintendo, The Pokémon Company, GAME FREAK, Creatures Inc. or Anthropic. Last updated ${TODAY}.</p></footer>
+<p class="fine">A free, non-commercial fan project. Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc. Game data from the pret/pokered disassembly. Not affiliated with Nintendo, The Pokémon Company, GAME FREAK, Creatures Inc. or Anthropic. Last updated ${LASTMOD}.</p></footer>
 </body>
 </html>
 `;
@@ -548,7 +557,7 @@ ${t === 'GHOST' ? '<p class="note">A famous Generation I bug: Ghost moves have n
   // ================================================================ guides and FAQ (written by hand, checked against the game)
   const guides = require('./site_guides.js')({ G, D, M, monName, monLink, moveLink, locLink, itemName, sprite, table, typeBadge, wildOf, superRod, SPECIAL, GYMS, leaderName, teamOf, list, pct, range, esc, TYPES, typeName, eff, found, obtainable, DEX, evoFrom, evoText });
   for (const g of guides) write(`/guides/${g.slug}/`, shell({ path: `/guides/${g.slug}/`, title: g.title, description: g.description, h1: g.h1, crumbs: [['/guides/', 'Guides'], [`/guides/${g.slug}/`, g.short || g.h1]], lead: g.lead, body: g.body, faq: g.faq,
-    jsonld: [{ '@type': g.howto ? 'HowTo' : 'Article', headline: g.h1, ...(g.howto ? { name: g.h1, step: g.howto.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, text: s })) } : {}), author: { '@type': 'Organization', name: 'Levy Street' }, publisher: { '@type': 'Organization', name: 'Levy Street', url: 'https://levystreet.com' }, dateModified: TODAY, mainEntityOfPage: SITE + 'guides/' + g.slug + '/' }] }), g.priority || 0.7);
+    jsonld: [{ '@type': g.howto ? 'HowTo' : 'Article', headline: g.h1, ...(g.howto ? { name: g.h1, step: g.howto.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, text: s })) } : {}), author: { '@type': 'Organization', name: 'Levy Street' }, publisher: { '@type': 'Organization', name: 'Levy Street', url: 'https://levystreet.com' }, dateModified: LASTMOD, mainEntityOfPage: SITE + 'guides/' + g.slug + '/' }] }), g.priority || 0.7);
   write('/guides/', shell({ path: '/guides/', title: 'Pokémon Red Guides: Walkthrough, Glitches, Legendaries & More', description: 'Pokémon Red guides: walkthrough, MissingNo. and the Mew glitch, legendary Pokémon, HMs, evolution stones, fossils, fishing, the Safari Zone and how to play online.',
     h1: 'Pokémon Red guides', crumbs: [['/guides/', 'Guides']], lead: 'Guides for Pokémon Red, written for <a href="/">Pokémon Claude Red</a> and true to the original game: the classic glitches work here exactly as they did in 1996.',
     body: `<ul class="cards">${guides.map(g => `<li><a href="/guides/${g.slug}/"><strong>${esc(g.h1)}</strong><span>${esc(g.description)}</span></a></li>`).join('')}</ul>
@@ -559,7 +568,8 @@ ${t === 'GHOST' ? '<p class="note">A famous Generation I bug: Ghost moves have n
     body: '<p><a class="play big" href="/?ref=faq">▶ Play Pokémon Claude Red</a></p>', faq: faqPage, jsonld: [{ '@type': 'VideoGame', name: 'Pokémon Claude Red', url: SITE, applicationCategory: 'Game', gamePlatform: 'Web browser', operatingSystem: 'Any', genre: ['Role-playing game', 'Adventure'], offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, author: { '@type': 'Organization', name: 'Levy Street', url: 'https://levystreet.com' } }] }), 0.9);
 
   // ================================================================ sitemap, llms.txt
-  const urls = [['/', 1.0], ...pages].map(([p, pr]) => `  <url><loc>${SITE}${p.replace(/^\//, '')}</loc><lastmod>${TODAY}</lastmod><priority>${pr.toFixed(1)}</priority></url>`);
+  stamp('/', fs.readFileSync(path.join(OUT, 'index.html'), 'utf8')); // the game page itself (its script hashes change with the code)
+  const urls = [['/', 1.0], ...pages].map(([p, pr]) => `  <url><loc>${SITE}${p.replace(/^\//, '')}</loc><lastmod>${next[p].lastmod}</lastmod><priority>${pr.toFixed(1)}</priority></url>`);
   fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
   fs.writeFileSync(path.join(OUT, 'llms.txt'), prose`# Pokémon Claude Red
 
@@ -586,6 +596,11 @@ ${guides.map(g => `- [${g.h1}](${SITE}guides/${g.slug}/): ${g.description}`).joi
 ## Source
 - [GitHub: levy-street/pokemon-claude-red](https://github.com/levy-street/pokemon-claude-red)
 `);
+  fs.mkdirSync(STATE, { recursive: true });
+  fs.writeFileSync(MANIFEST, JSON.stringify(next));
+  const pending = [...new Set([...readJSON(PENDING, []), ...changed])];
+  fs.writeFileSync(PENDING, JSON.stringify(pending));
+  console.log(`site: ${changed.length} page(s) changed, ${pending.length} waiting for IndexNow`);
   return pages.length + 1;
 };
 
